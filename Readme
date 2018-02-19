@@ -1,0 +1,23 @@
+
+Install Abra
+wget https://github.com/mozack/abra/releases/download/v0.96/abra-0.96-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+Install SeqPurge
+git clone --recursive https://github.com/imgag/ngs-bits.git
+make build_3rdparty
+#daoud installed qt5
+ alias qmake=qmake-qt5
+make build_tools_release
+source activate translocation-snake
+
+
+libqt5xmlpatterns5-dev libqt5sql5-mysql
+build_tools_release:
+        rm -rf build-tools-Linux-Release;
+        mkdir -p build-tools-Linux-Release;
+        cd build-tools-Linux-Release; \
+                qmake ../src/tools.pro "CONFIG-=debug" "CONFIG+=release" "DEFINES+=QT_NO_DEBUG_OUTPUT"; \
+                make;
+        cp bamtools/lib/libbamtools.so* bin/

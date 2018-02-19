@@ -1,0 +1,14 @@
+all:
+    REF_CHR: /net/nfs/PAT/home/tjitske/files/ref/incl_chr/hg19.fa
+    REF_NOCHR: /net/nfs/PAT/home/tjitske/files/ref/excl_chr/hg19_refgen_exclchr.fa
+    THREADS: 4
+    targets: manifest/BCNHLv2_primary_coord.bed
+    bait_intervals: manifest/BCNHLv2_bait_intervals.txt
+    target_intervals: manifest/BCNHLv2_target_intervals.txt
+
+trim:
+    min_len: 20
+    SeqPurge: /net/nfs/PAT/home/tjitske/ngs-bits/bin/SeqPurge
+
+abra:
+    abra_prog: /net/nfs/PAT/home/tjitske/abra/abra-0.96-SNAPSHOT-jar-with-dependencies.jar

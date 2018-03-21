@@ -109,8 +109,8 @@ rule Sambamba_sort:
     threads: config['all']['THREADS'],
     log:"../logs/sambamba/{sample}_sort.log",
     shell:
-        "sambamba sort -o {output.sortbam} --tmpdir {params.tmpdir} -t {threads} {input} 2> {log} "#&&"
-	   # "sambamba index -t {threads} {output.sortbam} {output.sortbai} 2>> {log}"
+       "sambamba sort -o {output.sortbam} --tmpdir {params.tmpdir} -t {threads} {input} 2> {log} &&"
+	   "sambamba index -t {threads} {output.sortbam} {output.sortbai} 2>> {log}"
 
 # rule Samtools_sort:
 #     input:
@@ -129,6 +129,7 @@ rule Sambamba_sort:
 rule ABRA:
     input:
         sortbam="../bam/{sample}_sorted_reads.bam",
+        sortbai="../bam/{sample}_sorted_reads.bam.bai",
     output:
         sv="../abra/{sample}_Abra.sv.txt",
         abra=temp("../bam/{sample}_abra-realigned.bam"),

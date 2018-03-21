@@ -8,7 +8,7 @@ rule all:
         #expand("../bam/{sample}_coordsorted_nochr.bam.bai" , sample=Samples),
         #expand("../fastqc/{sample}_R2_001_fastqc.html" , sample=Samples),
         #expand("../fastqc/{sample}_R1_trim_fastqc.html" , sample=Samples),
-        expand("../covMetrics/{sample}_HSmetrics.txt" , sample=Samples),
+        expand("../CovMetrics/{sample}_HSmetrics.txt" , sample=Samples),
         #expand("../fastqc/{sample}_R1_trim_fastqc.html", sample=Samples),
         expand("../bam/{sample}_coordsorted_nochr.bam", sample=Samples),
 
@@ -43,7 +43,7 @@ rule SeqPurge_trimming:
         SeqPurge=config["trim"]["SeqPurge"],
     log:"../logs/trimming/{sample}.log"
     shell:
-        "{params.SeqPurge} -min_len 20 -threads {threads} -in1 {input.fq1} -in2 {input.fq2}-out1 {output.out1} -out2 {output.out2}"
+        "{params.SeqPurge} -min_len 20 -threads {threads} -in1 {input.fq1} -in2 {input.fq2} -out1 {output.out1} -out2 {output.out2}"
 
 rule fastqc_trimmed:
     input:
@@ -149,7 +149,7 @@ rule mark_duplicates:
     output:
         qsorted=temp("../bam/{sample}_querysorted.bam"),
         dedup=temp("../bam/{sample}_dedupped.bam"),
-        metrics_file="../covMetrics/{sample}.metrics.txt",
+        metrics_file="../CovMetrics/{sample}.metrics.txt",
     log: "../logs/mark_duplicates/{sample}.log",
     params:
         tmpdir=temp("../tmp")
@@ -181,9 +181,9 @@ rule CollectHsMetrics:
     input:
         coordsorted="../bam/{sample}_coordsorted.bam",
     output:
-        HSmetrics="../covMetrics/{sample}_HSmetrics.txt",
-        PerTargetCov="../covMetrics/{sample}_PerTargetCov.txt",
-        PerBaseCov="../covMetrics/{sample}_PerBaseCov.txt",
+        HSmetrics="../CovMetrics/{sample}_HSmetrics.txt",
+        PerTargetCov="../CovMetrics/{sample}_PerTargetCov.txt",
+        PerBaseCov="../CovMetrics/{sample}_PerBaseCov.txt",
     params:
         BAIT_INTERVALS=config["all"]["bait_intervals"],
         TARGET_INTERVALS=config["all"]["target_intervals"],
@@ -214,6 +214,25 @@ rule remove_chr_prefix :
         "samtools view -@ {threads} -Sb  {output.nochrsam} > {output.nochrbam} && "
         "samtools index {output.nochrbam} "
 
+rule BaseRecalibration:
+        input:
+                coordsorted="../bam/{sample}_coordsorted.bam",
+        output:
+                recal_table="../baseRecal/{sample}_recal_data.table",
+                bam="../bam/{sample}_recal.bam",
+        params:
+                ref=config["all"]["REF_CHR"],
+                targets=config['all']['targets'],
+                known_indels=config['baseRecalibration']['known_indels'],
+                known_snps=config['baseRecalibration']['known_snps'],
+        threads: config['all']['THREADS']
+        conda:
+                "envs/gatk4.yaml"
+        log: "../logs/baseRecalibration/{sample}_baseRecalibration.txt"
+        shell:
+                "gatk-launch BaseRecalibrator -R {params.ref} -I {input.coordsorted} -L {params.targets} "
+                "-known-sites {params.known_indels} -known-sites {params.known_snps} --output {output.recal_table} &> {log} &&"
+                "gatk-launch ApplyBQSR -R {params.ref} -I {input.coordsorted} --bqsr-recal-file {output.recal_table} -O {output.bam} &>> {log}"
 
 # rule :
 #     input:

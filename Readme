@@ -7,7 +7,7 @@ wget https://github.com/mozack/abra/releases/download/v0.96/abra-0.96-SNAPSHOT-j
 Install SeqPurge
 git clone --recursive https://github.com/imgag/ngs-bits.git
 make build_3rdparty
-#daoud installed qt5
+#daoud installed qt5 and xmlpatterns
  alias qmake=qmake-qt5
 make build_tools_release
 source activate translocation-snake

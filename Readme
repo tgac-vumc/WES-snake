@@ -22,27 +22,13 @@ git clone https://github.com/tgac-vumc/Alignment-snake.git
 cd Alignment-snake
 ```
 
-install the complete alignment-snake environment using conda or install just the snakemake environment,
-the last option is useful if you only want to use part of the pipeline and not want to install all required programs.
-```
-conda env create --name  Alignment-snake --file environment.yaml
+install the snakemake environment,
 
-or
+```
 
 conda env create --name snakemake --file snakemake.yaml
 
 ```
-Install dependencies not available in conda:
-
-Abra: https://github.com/mozack/abra/releases/download/v0.96/abra-0.96-SNAPSHOT-jar-with-dependencies.jar
-SeqPurge : https://github.com/imgag/ngs-bits.git
-
-
-activate the environment by:
-```
-source activate Alignment-snake
-
-or
 
 source activate snakemake
 
@@ -51,11 +37,6 @@ source activate snakemake
 go to alignment-snake directory and change the configfile with the correct paths to the reference files, than start snakemake.
 
 ```
-
-snakemake
-
-or in case the snakemake environment is installed:
-
 snakemake --use-conda
 
 ```

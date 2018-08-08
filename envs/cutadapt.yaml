@@ -1,0 +1,6 @@
+channels:
+    - conda-forge
+    - bioconda
+dependencies:
+    - cutadapt ==1.16
+    - pigz

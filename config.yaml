@@ -1,18 +1,29 @@
 all:
-    REF_CHR: /net/nfs/PAT/home/tjitske/files/ref/incl_chr/hg19.fa
-    REF_NOCHR: /net/nfs/PAT/home/tjitske/files/ref/excl_chr/hg19_refgen_exclchr.fa
-    THREADS: 4
-    targets: manifest/BCNHLv2_primary_coord.bed
-    bait_intervals: manifest/BCNHLv2_bait_intervals.txt
-    target_intervals: manifest/BCNHLv2_target_intervals.txt
+    REF: /net/nfs/PAT/home/tjitske/files/ref/GRch37/Homo_sapiens.GRCh37.69.dna_sm.primary_assembly.fa
+    #REF: /net/nfs/PAT/data/ref/hg19/ensembl/bwa-0.7.5a/Homo_sapiens.GRCh37.69.dna_sm.primary_assembly.fa #no chr prefix
+    #REF: /net/nfs/PAT/home/tjitske/files/ref/incl_chr/hg19.fa
+    #REF_NOCHR: /net/nfs/PAT/home/tjitske/files/ref/excl_chr/hg19_refgen_exclchr.fa
+    THREADS: 8
+    Java_mem: -Xmx4g
+    targets: manifest/MedExome_hg19_primary_coord.bed
+    bait_intervals: manifest/MedExome_hg19_bait_intervals_nochr.txt
+    target_intervals: manifest/MedExome_hg19_target_intervals_nochr.txt
+    #bait_intervals: manifest/MedExome_hg19_bait_intervals_chr_human.txt
+    #target_intervals: manifest/MedExome_hg19_target_intervals_chr_human.txt
+    #dbsnp: "/net/nfs/PAT/home/tjitske/dbSNP/b151/All_20180423_Mutect2_AF.vcf.gz"  #dbSNP b151 excl chr
+    dbsnp: /net/nfs/PAT/home/matias/dbSNP/b151/All_20180423.vcf.gz
+    #snps: /net/nfs/PAT/home/tjitske/dbSNP/gnomAD/2.0.2/gnomad.exomes.r2.0.2-AF_chr.vcf.gz #gnomAD incl chr
+    snps: /net/nfs/PAT/home/tjitske/dbSNP/gnomAD/2.0.2/gnomad.exomes.r2.0.2-AF.vcf.gz  #gnomAD excl chr
+    #snps: /net/nfs/PAT/home/tjitske/dbSNP/b151/All_20180423_Mutect2_AF_chr.vcf.gz  #dbSNP b151 incl chr
+    clinvar: /net/nfs/PAT/home/matias/dbSNP/b151/clinvar_20180701.vcf.gz
+    Cosmic: /net/nfs/PAT/home/matias/data/ref/cosmic/hg19_v84_2018/CosmicCodingMuts_BCNHLv2_v84_hg19.vcf
 
 trim:
     min_len: 20
-    SeqPurge: /net/nfs/PAT/home/tjitske/ngs-bits/bin/SeqPurge
 
-abra:
-    abra_prog: /net/nfs/PAT/home/tjitske/abra/abra-0.96-SNAPSHOT-jar-with-dependencies.jar
+#abra:
+    #abra_prog: /net/nfs/PAT/home/tjitske/abra/abra-0.96-SNAPSHOT-jar-with-dependencies.jar
 
-baseRecalibration:
-    known_indels: /net/nfs/PAT/data/ref/gatk_bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf
-    known_snps: /net/nfs/PAT/data/ref/gatk_bundle/2.8/hg19/dbsnp_138.hg19.vcf
+#baseRecalibration:
+#    known_indels: /net/nfs/PAT/data/ref/gatk_bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf
+#    known_snps: /net/nfs/PAT/data/ref/gatk_bundle/2.8/hg19/dbsnp_138.hg19.vcf

@@ -20,8 +20,12 @@ def getnames(samplelist):
         #SAMPLES[sample]=fastqfile
     return(SAMPLES)
 
-Tumor_samples=getnames(Tumor)  # dictionary containing samplename as key and samplename with lanenumber as value
-Normal_samples=getnames(Normal) # dictionary containing samplename as key and samplename with lanenumber as value
+#Tumor_samples=getnames(Tumor)  # dictionary containing samplename as key and samplename with lanenumber as value
+#Normal_samples=getnames(Normal) # dictionary containing samplename as key and samplename with lanenumber as value
+
+# I merged samples sequenced first time and second time after deduplication by hand (merge_bam.sh) for the merged samples I don't use the lanenumber, so I don't need getnames, because I don't want to change the whole script I keep using a dict format.
+Tumor_samples=dict(zip(Tumor, Tumor))
+Normal_samples=dict(zip(Normal, Normal))
 pairs=dict(zip(Tumor, Normal)) # dictionary containing Tumorname as key and normalname as value
 
 rule all:
@@ -29,11 +33,14 @@ rule all:
         expand("../Mutect2/{tumor}.somatic.vcf.gz", tumor=Tumor_samples.keys()),
         expand("../Mutect2/{tumor}.somatic_filtered.vcf.gz", tumor=Tumor_samples.keys()),
         #expand("../bam/{sample}_coordsorted_nochr.bam.bai" , sample=Samples),
-        expand("../fastqc/{sample}_R1_001_fastqc.html" , sample=Samples),
-        expand("../fastqc/{sample}_R1_trim_fastqc.html" , sample=Samples),
-        expand("../CovMetrics/{sample}_HSmetrics.txt" , sample=Samples),
+        #expand("../fastqc/{sample}_R1_001_fastqc.html" , sample=Samples),
+        #expand("../fastqc/{sample}_R1_trim_fastqc.html" , sample=Samples),
+        expand("../CovMetrics/{sample}_HSmetrics.txt" , sample=Tumor_samples.keys()),
+        expand("../CovMetrics/{sample}_HSmetrics.txt" , sample=Normal_samples.keys()),
         expand("../vcf/annotated/{tumor}.annotated_effect.vcf", tumor=Tumor_samples.keys()),
-        expand("../vcf/filtered/{tumor}.LOW.csv", tumor=Tumor_samples.keys())
+        expand("../vcf/filtered/{tumor}.all_evidenced.csv", tumor=Tumor_samples.keys()),
+        expand("../vcf/filtered/{tumor}.all_evidenced.vcf", tumor=Tumor_samples.keys()),
+		#"../MutationalPatterns/mutationspectrum_96.png"
         #expand("../fastqc/{sample}_R1_trim_fastqc.html", sample=Samples),
         #expand("../bam/{sample}_coordsorted_nochr.bam", sample=Samples),
 
@@ -140,39 +147,6 @@ rule Sambamba_sort:
     shell:
        "sambamba sort -o {output.qsorted} --sort-by-name --tmpdir={params.tmpdir} -t {threads} {input} 2> {log} "
 
-
-# rule Samtools_sort:
-#     input:
-#         "../bam/{sample}_aligned_reads.bam",
-#     output:
-#         sortbam="../bam/{sample}_sorted_reads.bam",
-#         sortbai="../bam/{sample}_sorted_reads.bam.bai",
-#     params:
-#         tmpdir="../abra/{sample}/tmp",
-#     threads: config['all']['THREADS'],
-#     log:"../logs/samtools/{sample}_sort.log",
-#     shell:
-#         "samtools sort -o {output.sortbam} -@ {threads} {input} 2>{log} &&"
-# 	    "samtools index {output.sortbam} 2>>{log}"
-
-# rule ABRA:
-#     input:
-#         sortbam="../bam/{sample}_sorted_reads.bam",
-#         sortbai="../bam/{sample}_sorted_reads.bam.bai",
-#     output:
-#         sv="../abra/{sample}_Abra.sv.txt",
-#         abra=temp("../bam/{sample}_abra-realigned.bam"),
-#     params:
-#         ref= config['all']['REF'],
-#         targets=config['all']['targets'],
-#         tmpdir="../abra/{sample}/",
-#         abra_prog=config["abra"]["abra_prog"]
-#     threads: config['all']['THREADS'],
-#     log:"../logs/abra/{sample}.log",
-#     shell:
-#         "java -Xmx8G -jar {params.abra_prog} --in {input.sortbam} --out {output.abra} "
-#         "--ref {params.ref} --targets {params.targets} --threads {threads} --working {params.tmpdir} --sv {output.sv} &> {log}"
-
 rule mark_duplicates:
     input:
         qsorted="../bam/{sample}_querysorted.bam",
@@ -216,7 +190,7 @@ rule CollectHsMetrics:
         PerBaseCov="../CovMetrics/{sample}_PerBaseCov.txt",
     params:
         BAIT_INTERVALS=config["all"]["bait_intervals"],
-        TARGET_INTERVALS=config["all"]["target_intervals"],
+        TARGET_INTERVALS=config["all"]["bait_intervals"],
         ref=config["all"]["REF"],
     conda:
         "envs/picard.yaml"
@@ -243,7 +217,8 @@ rule Mutect2:
 	params:
 		ref=config["all"]["REF"],
 		snps=config["all"]["snps"],
-		normalname=lambda wildcards:pairs[wildcards.tumor]
+		normalname=lambda wildcards:pairs[wildcards.tumor],
+		tmpdir=temp("../tmp"),
 	threads: config['all']['THREADS']
 	conda:
 		"envs/gatk4.yaml"
@@ -251,7 +226,7 @@ rule Mutect2:
 	shell:
 		"gatk Mutect2 -R {params.ref} -I {input.tumor} -tumor {wildcards.tumor} -I {input.normal} -normal"
 		" {params.normalname} --germline-resource {params.snps} -O {output.vcf} -bamout {output.bamout} "
-		"--native-pair-hmm-threads {threads} &> {log}"
+		"--native-pair-hmm-threads {threads} --TMP_DIR {params.tmpdir} &> {log}"
 
 #Specify the case sample for somatic calling with two parameters. Provide the BAM with -I and the sample's read group sample name (the SM field value) with -tumor. To look up the read group SM field use GetSampleName. Alternatively, use samtools view -H tumor.bam | grep '@RG'.
 
@@ -303,101 +278,55 @@ rule SnpEff:
 		"snpEff {params.Java_mem} eff -filterInterval {params.targets} -v -canon -strict "
 		"-stats {output.snpEff_stats} hg19 {input.annotated} > {output.effect} 2> {log} "
 
-
+#TODO make params of SnpSift_filters
 rule SnpSift_filter:
 	input:
 		effect="../vcf/annotated/{tumor}.annotated_effect.vcf",
 	output:
-		low="../vcf/filtered/{tumor}.LOW.vcf",
-		high="../vcf/filtered/{tumor}.HIGH.vcf"
+		highimpact="../vcf/filtered/{tumor}.high_impact.vcf",
+		lowimpact="../vcf/filtered/{tumor}.low_impact.vcf",
+		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.vcf"
+	params:
+		minimal_Alternative_depth=4
 	conda:
 		"envs/SnpSift.yaml"
 	shell:
 		"""
-		SnpSift filter -f {input.effect} "(FILTER='PASS')&((ANN[0].IMPACT='HIGH') | (ANN[0].IMPACT='MODERATE'))"> {output.high} && \
-		SnpSift filter -f {input.effect} "(FILTER='PASS')" | SnpSift filter -n "(ANN[0].IMPACT='HIGH') | (ANN[0].IMPACT='MODERATE')" > {output.low}
+		SnpSift filter -f {input.effect} "(GEN[1].AD[1] >= 4) & (GEN[0].AD[0] + GEN[0].AD[1] > 10) & (GEN[1].AD[0] + GEN[1].AD[1] > 10) & (FILTER='PASS') &  (GEN[1].F1R2[1] >= 1) & (GEN[1].F2R1[1] >= 1) & GEN[1].AF >= 0.05" > {output.all_evidenced} && \
+		SnpSift filter -f {output.all_evidenced} -n "(ANN[0].IMPACT='HIGH') | (ANN[0].IMPACT='MODERATE')" > {output.lowimpact} && \
+		SnpSift filter -f {output.all_evidenced} "((ANN[0].IMPACT='HIGH') | (ANN[0].IMPACT='MODERATE'))" > {output.highimpact}
 		"""
 
 rule SnpSift_csv:
 	input:
-		high="../vcf/filtered/{tumor}.HIGH.vcf",
-		low="../vcf/filtered/{tumor}.LOW.vcf"
+		highimpact="../vcf/filtered/{tumor}.high_impact.vcf",
+		lowimpact="../vcf/filtered/{tumor}.low_impact.vcf",
+		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.vcf"
 	output:
-		high="../vcf/filtered/{tumor}.HIGH.csv",
-		low="../vcf/filtered/{tumor}.LOW.csv"
+		highimpact="../vcf/filtered/{tumor}.high_impact.csv",
+		lowimpact="../vcf/filtered/{tumor}.low_impact.csv",
+		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.csv"
 	params:
 		fields='CHROM POS "ANN[0].GENE" REF ALT DP "GEN[0].AD" "GEN[1].AD" "GEN[0].AF" "GEN[1].AF" "ANN[0].IMPACT" \
-		"ANN[0].EFFECT" "ANN[0].HGVS_C" "ANN[0].HGVS_P" ID "COMMON" "RS" POP_AF "CAF"  "LOF" "NMD" "MUT" \
+		"ANN[0].EFFECT" FILTER "GEN[1].F1R2" "GEN[1].F2R1" "GEN[1].MBQ" "GEN[1].MMQ" "ANN[0].HGVS_C" \
+		"ANN[0].HGVS_P" ID "COMMON" "RS" POP_AF "CAF"  "LOF" "NMD" "MUT" \
 		"CLNSIG" "ORIGIN" "SNP" "COSM.ID" "FATHMM" "MUT.ST"'
 	conda:
 		"envs/SnpSift.yaml"
 	shell:
 		"""
-		SnpSift extractFields -e "." {input.high} {params.fields} > {output.high} && \
-		SnpSift extractFields -e "." {input.low} {params.fields} > {output.low}
+		SnpSift extractFields -e "." {input.highimpact} {params.fields} > {output.highimpact} && \
+		SnpSift extractFields -e "." {input.lowimpact} {params.fields} > {output.lowimpact} && \
+		SnpSift extractFields -e "." {input.all_evidenced} {params.fields} > {output.all_evidenced}
 		"""
-#GT:AD:AF:F1R2:F2R1:MBQ:MFRL:MMQ:MPOS:SA_MAP_AF:SA_POST_PROB
-### Create csv files - extract fields of interest
-#java -jar $snpEff/SnpSift.jar extractFields -e "." $vcf_out \
-#CHROM POS "ANN[0].GENE" REF ALT DP AF \
-#"ANN[0].IMPACT" "ANN[0].EFFECT" "ANN[0].HGVS_C" "ANN[0].HGVS_P" \
-#ID "COMMON" "RS" "CAF" "LOF" "NMD" "MUT" \
-#"CLNSIG" "ORIGIN" "SNP" "AF_EXAC" "AF_TGP" "gnomAD_AF" \
-#"COSM.ID" "FATHMM" "MUT.ST" "PON_BLACKLIST"> $vcf_csv
 
-#	java -jar $SnpSift filter -f $somatic_vcf \
-#	"(ANN[0].IMPACT='HIGH') | (ANN[0].IMPACT='MODERATE')" > $HI_somatic_vcf
-
-#	java -jar $SnpSift filter -f $somatic_vcf -n \
-#	"(ANN[0].IMPACT='HIGH') | (ANN[0].IMPACT='MODERATE')" > $LOW_somatic_vcf
-
-
-
-# rule remove_chr_prefix :
-#     input:
-#         coordsorted="../bam/{sample}_coordsorted.bam",
-#     output:
-#         nochrsam=temp("../bam/{sample}_coordsorted_nochr.sam"),
-#         nochrbam="../bam/{sample}_coordsorted_nochr.bam",
-#         nochrbai="../bam/{sample}_coordsorted_nochr.bam.bai",
-#     params:
-#     conda:
-#         "envs/samtools.yaml"
-#     threads: config['all']['THREADS'],
-#     log: "../logs/samtools/{sample}-remove_prefix.txt"
-#     shell:
-#         "samtools view -@ {threads} -h {input.coordsorted} | sed -e 's/chr//g' > {output.nochrsam} && "
-#         "samtools view -@ {threads} -Sb  {output.nochrsam} > {output.nochrbam} && "
-#         "samtools index {output.nochrbam} "
-
-# rule BaseRecalibration:
-#         input:
-#                 coordsorted="../bam/{sample}_coordsorted.bam",
-#         output:
-#                 recal_table="../baseRecal/{sample}_recal_data.table",
-#                 bam="../bam/{sample}_recal.bam",
-#         params:
-#                 ref=config["all"]["REF"],
-#                 targets=config['all']['targets'],
-#                 known_indels=config['baseRecalibration']['known_indels'],
-#                 known_snps=config['baseRecalibration']['known_snps'],
-#         threads: config['all']['THREADS']
-#         conda:
-#                 "envs/gatk4.yaml"
-#         log: "../logs/baseRecalibration/{sample}_baseRecalibration.txt"
-#         shell:
-#                 "gatk-launch BaseRecalibrator -R {params.ref} -I {input.coordsorted} -L {params.targets} "
-#                 "-known-sites {params.known_indels} -known-sites {params.known_snps} --output {output.recal_table} &> {log} &&"
-#                 "gatk-launch ApplyBQSR -R {params.ref} -I {input.coordsorted} --bqsr-recal-file {output.recal_table} -O {output.bam} &>> {log}"
-
-
-# rule :
-#     input:
-#
-#     output:
-#
-#     params:
-#
-#     threads: config['all']['THREADS']
-#     log:
-#     shell:
+# rule MutationalPatterns:
+# 	input:
+# 		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.vcf",
+# 		script="scripts/Mutational_patterns.R"
+# 	output:
+# 		figure="../MutationalPatterns/mutationspectrum_96.png"
+# 	conda:
+# 		"envs/R.yaml"
+# 	script:
+# 		"{input.script}"

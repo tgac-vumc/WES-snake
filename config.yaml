@@ -3,7 +3,7 @@ all:
     #REF: /net/nfs/PAT/data/ref/hg19/ensembl/bwa-0.7.5a/Homo_sapiens.GRCh37.69.dna_sm.primary_assembly.fa #no chr prefix
     #REF: /net/nfs/PAT/home/tjitske/files/ref/incl_chr/hg19.fa
     #REF_NOCHR: /net/nfs/PAT/home/tjitske/files/ref/excl_chr/hg19_refgen_exclchr.fa
-    THREADS: 8
+    THREADS: 4
     Java_mem: -Xmx4g
     targets: manifest/MedExome_hg19_primary_coord.bed
     bait_intervals: manifest/MedExome_hg19_bait_intervals_nochr.txt

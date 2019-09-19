@@ -29,7 +29,8 @@ install the snakemake environment,
 conda env create --name snakemake --file snakemake.yaml
 
 ```
-
+activate the snakemake environment
+```
 source activate snakemake
 
 ```

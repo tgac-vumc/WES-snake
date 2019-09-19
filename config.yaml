@@ -20,10 +20,3 @@ all:
 
 trim:
     min_len: 20
-
-#abra:
-    #abra_prog: /net/nfs/PAT/home/tjitske/abra/abra-0.96-SNAPSHOT-jar-with-dependencies.jar
-
-#baseRecalibration:
-#    known_indels: /net/nfs/PAT/data/ref/gatk_bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf
-#    known_snps: /net/nfs/PAT/data/ref/gatk_bundle/2.8/hg19/dbsnp_138.hg19.vcf

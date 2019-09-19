@@ -20,29 +20,16 @@ def getnames(samplelist):
         #SAMPLES[sample]=fastqfile
     return(SAMPLES)
 
-#Tumor_samples=getnames(Tumor)  # dictionary containing samplename as key and samplename with lanenumber as value
-#Normal_samples=getnames(Normal) # dictionary containing samplename as key and samplename with lanenumber as value
+Tumor_samples=getnames(Tumor)  # dictionary containing samplename as key and samplename with lanenumber as value
+Normal_samples=getnames(Normal) # dictionary containing samplename as key and samplename with lanenumber as value
 
-# I merged samples sequenced first time and second time after deduplication by hand (merge_bam.sh) for the merged samples I don't use the lanenumber, so I don't need getnames, because I don't want to change the whole script I keep using a dict format.
-Tumor_samples=dict(zip(Tumor, Tumor))
-Normal_samples=dict(zip(Normal, Normal))
 pairs=dict(zip(Tumor, Normal)) # dictionary containing Tumorname as key and normalname as value
 
 rule all:
     input:
-        expand("../Mutect2/{tumor}.somatic.vcf.gz", tumor=Tumor_samples.keys()),
-        expand("../Mutect2/{tumor}.somatic_filtered.vcf.gz", tumor=Tumor_samples.keys()),
-        #expand("../bam/{sample}_coordsorted_nochr.bam.bai" , sample=Samples),
-        #expand("../fastqc/{sample}_R1_001_fastqc.html" , sample=Samples),
-        #expand("../fastqc/{sample}_R1_trim_fastqc.html" , sample=Samples),
         expand("../CovMetrics/{sample}_HSmetrics.txt" , sample=Tumor_samples.keys()),
         expand("../CovMetrics/{sample}_HSmetrics.txt" , sample=Normal_samples.keys()),
-        expand("../vcf/annotated/{tumor}.annotated_effect.vcf", tumor=Tumor_samples.keys()),
-        expand("../vcf/filtered/{tumor}.all_evidenced.csv", tumor=Tumor_samples.keys()),
-        expand("../vcf/filtered/{tumor}.all_evidenced.vcf", tumor=Tumor_samples.keys()),
-		#"../MutationalPatterns/mutationspectrum_96.png"
-        #expand("../fastqc/{sample}_R1_trim_fastqc.html", sample=Samples),
-        #expand("../bam/{sample}_coordsorted_nochr.bam", sample=Samples),
+        expand("../vcf/filtered/{tumor}.all_evidenced.vcf", tumor=Tumor_samples.keys())
 
 rule fastqc:
     input:
@@ -278,7 +265,7 @@ rule SnpEff:
 		"snpEff {params.Java_mem} eff -filterInterval {params.targets} -v -canon -strict "
 		"-stats {output.snpEff_stats} hg19 {input.annotated} > {output.effect} 2> {log} "
 
-#TODO make params of SnpSift_filters
+#TODO make params of SnpSift_filters instead of hardcoded
 rule SnpSift_filter:
 	input:
 		effect="../vcf/annotated/{tumor}.annotated_effect.vcf",
@@ -320,6 +307,7 @@ rule SnpSift_csv:
 		SnpSift extractFields -e "." {input.all_evidenced} {params.fields} > {output.all_evidenced}
 		"""
 
+#TODO add analysis such as MutationalPatterns, summary files, combining with copy numbers, Circosplots etc.
 # rule MutationalPatterns:
 # 	input:
 # 		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.vcf",

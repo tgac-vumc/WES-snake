@@ -16,7 +16,8 @@ all:
     snps: /net/nfs/PAT/home/tjitske/dbSNP/gnomAD/2.0.2/gnomad.exomes.r2.0.2-AF.vcf.gz  #gnomAD excl chr
     #snps: /net/nfs/PAT/home/tjitske/dbSNP/b151/All_20180423_Mutect2_AF_chr.vcf.gz  #dbSNP b151 incl chr
     clinvar: /net/nfs/PAT/home/matias/dbSNP/b151/clinvar_20180701.vcf.gz
-    Cosmic: /net/nfs/PAT/home/matias/data/ref/cosmic/hg19_v84_2018/CosmicCodingMuts_BCNHLv2_v84_hg19.vcf
+    #Cosmic: /net/nfs/PAT/home/matias/data/ref/cosmic/hg19_v84_2018/CosmicCodingMuts_BCNHLv2_v84_hg19.vcf
+    Cosmic: /net/nfs/PAT/home/matias/data/ref/cosmic/hg19_v84_2018/CosmicCodingMuts_Custom_v84_hg19.vcf
 
 trim:
     min_len: 20

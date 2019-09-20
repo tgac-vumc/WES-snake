@@ -36,9 +36,9 @@ source activate snakemake
 ```
 
 Setup your files correctly:
-	- Place (links to) fastq files in the fastq directory one directory up from the WES-snake folder.
-	- Change the matching_samples.tsv file with your sample Normal_samples
-	- Change the configfile with the correct paths to the reference files and check if the correct manifest files are present
+	- Place (links to) fastq files in the fastq directory one directory up from the WES-snake folder.   
+	- Change the matching_samples.tsv file with your sample Normal_samples    
+	- Change the configfile with the correct paths to the reference files and check if the correct manifest files are present   
 
 go to WES-snake directory and start snakemake.
 
@@ -48,11 +48,11 @@ snakemake --use-conda
 ```
 Useful snakemake options
 
--j , --cores, --jobs : Use at most N cores in parallel (default: 1). If N is omitted, the limit is set to the number of available cores.
--n , --dryrun : Do not execute anything. but show rules which are planned to be performed.
--k , --keep-going : Go on with independent jobs if a job fails.
--f , --force : Force the execution of the selected target or the first rule regardless of already created output.
--U , --until : Runs the pipeline until it reaches the specified rules or files. Only runs jobs that are dependencies of the specified rule or files, does not run sibling DAGs.
--T , --timestamp : Add a timestamp to all logging output
-
+-j , --cores, --jobs : Use at most N cores in parallel (default: 1). If N is omitted, the limit is set to the number of available cores.   
+-n , --dryrun : Do not execute anything. but show rules which are planned to be performed.    
+-k , --keep-going : Go on with independent jobs if a job fails.    
+-f , --force : Force the execution of the selected target or the first rule regardless of already created output.   
+-U , --until : Runs the pipeline until it reaches the specified rules or files. Only runs jobs that are dependencies of the specified rule or files, does not run sibling DAGs.   
+-T , --timestamp : Add a timestamp to all logging output   
+ 
 for all options go to http://snakemake.readthedocs.io/en/stable/executable.html#all-options

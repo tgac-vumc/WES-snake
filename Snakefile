@@ -9,7 +9,7 @@ all_Samples=pd.read_csv('matching_samples.tsv', sep='\t')
 
 Tumor=list(all_Samples['Tumor'])
 Normal=list(all_Samples['Normal'])
-
+# TODO check in which cases the getnames function is useful, probable this can be removed 
 def getnames(samplelist):
     SAMPLES=dict()
     for sample in samplelist:
@@ -20,8 +20,11 @@ def getnames(samplelist):
         #SAMPLES[sample]=fastqfile
     return(SAMPLES)
 
-Tumor_samples=getnames(Tumor)  # dictionary containing samplename as key and samplename with lanenumber as value
-Normal_samples=getnames(Normal) # dictionary containing samplename as key and samplename with lanenumber as value
+#Tumor_samples=getnames(Tumor)  # dictionary containing samplename as key and samplename with lanenumber as value
+#Normal_samples=getnames(Normal) # dictionary containing samplename as key and samplename with lanenumber as value
+# TODO this can be made easier but need alterations in the whole script so this is the quick solution. 
+Tumor_samples=dict(zip(Tumor, Tumor))
+Normal_samples=dict(zip(Normal, Normal)
 
 pairs=dict(zip(Tumor, Normal)) # dictionary containing Tumorname as key and normalname as value
 

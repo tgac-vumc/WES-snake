@@ -197,6 +197,7 @@ rule CollectHsMetrics:
         "PER_BASE_COVERAGE={output.PerBaseCov} "
         "REFERENCE_SEQUENCE={params.ref} 2> {log}"
 
+#TODO probably normalname and tumorname can be done in a nicer way - or rg group in bwa-mem should be different that it match the file name.
 rule Mutect2:
 	input:
 		tumor=lambda wildcards:"../bam/"+Tumor_samples[wildcards.tumor]+"_coordsorted.bam",
@@ -207,14 +208,16 @@ rule Mutect2:
 	params:
 		ref=config["all"]["REF"],
 		snps=config["all"]["snps"],
-		normalname=lambda wildcards:pairs[wildcards.tumor],
+		#normalname=lambda wildcards:pairs[wildcards.tumor],
+		normalname=lambda wildcards:re.match('[a-zA-Z0-9\-]*', Normal_samples[pairs[wildcards.tumor]]).group(0),
+		tumorname=lambda wildcards:re.match('[a-zA-Z0-9\-]*',wildcards.tumor).group(0),
 		tmpdir=temp("../tmp"),
 	threads: config['all']['THREADS']
 	conda:
 		"envs/gatk4.yaml"
 	log: "../logs/Mutect2/{tumor}_mutect2.txt"
 	shell:
-		"gatk Mutect2 -R {params.ref} -I {input.tumor} -tumor {wildcards.tumor} -I {input.normal} -normal"
+		"gatk Mutect2 -R {params.ref} -I {input.tumor} -tumor {params.tumorname} -I {input.normal} -normal"
 		" {params.normalname} --germline-resource {params.snps} -O {output.vcf} -bamout {output.bamout} "
 		"--native-pair-hmm-threads {threads} --TMP_DIR {params.tmpdir} &> {log}"
 

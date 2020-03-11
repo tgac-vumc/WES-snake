@@ -1,3 +1,17 @@
+
+path:
+    fastq: 'fastq'
+    qc: 'qc'
+    bam: 'bam'
+    log: 'log'
+    covariance: 'CovMetrics'
+    temp: '/home/y.kim1/temp/'
+
+platform:
+    SRorPE: 'PE'
+    prefix: ['_R1_001', '_R2_001']
+
+
 all:
     REF: /net/nfs/PAT/home/tjitske/files/ref/GRch37/Homo_sapiens.GRCh37.69.dna_sm.primary_assembly.fa
     #REF: /net/nfs/PAT/data/ref/hg19/ensembl/bwa-0.7.5a/Homo_sapiens.GRCh37.69.dna_sm.primary_assembly.fa #no chr prefix

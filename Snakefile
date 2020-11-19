@@ -19,7 +19,7 @@ PREFIX = config['platform']['prefix'] # prefix before "fastq.gz"
 
 
 ## obtain sample list ###########
-all_Samples=pd.read_csv('matching_samples.tsv', sep='\t')
+all_Samples=pd.read_csv('test_samples.tsv', sep='\t')
 
 Tumor=list(all_Samples['Tumor']) # these are IDs, and use as the key to fetch files.
 Normal=list(all_Samples['Normal'])
@@ -92,7 +92,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
         input:
             lambda wildcards: AllFiles[wildcards.sample][wildcards.R1R2]
         output:
-            temp(path.join(PATH_FASTQ, '{sample}.fastq.merged{R1R2}.gz'))
+            path.join(PATH_FASTQ, '{sample}.fastq.merged{R1R2}.gz')
         shell:
             "cat {input} > {output}"
 
@@ -132,7 +132,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             "envs/cutadapt.yaml"
         shell:
             "cutadapt -a {params.adapter3} -A {params.adapter5} -j {threads} --minimum-length {params.min_len} "
-            " -o {output.out1} -p {output.out2} {input.fq1} {input.fq2}  > {log}"
+            " -o {output.out1} -p {output.out2} {input.fq1} {input.fq2} > {log}"
 
     rule fastqc_trimmed:
         input:
@@ -211,7 +211,7 @@ rule Sambamba_sort:
     threads: config['all']['THREADS']
     log: path.join(PATH_LOG, "sambamba","{sample}_sort.log")
     shell:
-       "sambamba sort -o {output.qsorted} --sort-by-name --tmpdir={params.tmpdir} -t {threads} {input} 2> {log} "
+       "sambamba sort -o {output.qsorted} --sort-by-name --tmpdir={params.tmpdir} -t {threads} -m 5000000000 {input} 2> {log} "
 
 rule mark_duplicates:
     input:
@@ -226,7 +226,7 @@ rule mark_duplicates:
     conda:
         "envs/picard.yaml"
     shell:
-        "picard -Xms1g -Xmx8g MarkDuplicates I={input.qsorted} O={output.dedup} M={output.metrics_file} "
+        "picard -Xms4g -Xmx16g MarkDuplicates I={input.qsorted} O={output.dedup} M={output.metrics_file} "
         "ASSUME_SORT_ORDER=queryname TMP_DIR={params.tmpdir} &> {log} ;"
 
 rule Sambamba_sort2:
@@ -242,7 +242,7 @@ rule Sambamba_sort2:
         "envs/picard.yaml"
     log: path.join(PATH_LOG, "sambamba/{sample}_sort2.log"),
     shell:
-        "sambamba sort -o {output.coordsorted} --tmpdir {params.tmpdir} -t {threads} {input.dedup} 2> {log} && "
+        "sambamba sort -o {output.coordsorted} --tmpdir {params.tmpdir} -t {threads} -m 5000000000 {input.dedup} 2> {log} && "
         "sambamba index -t {threads} {output.coordsorted} {output.sortbai} 2>> {log}"
         #"picard BuildBamIndex I={output.coordsorted} 2>> {log}"                      #change? samtools
 
@@ -263,7 +263,7 @@ rule CollectHsMetrics:
     threads: config['all']['THREADS'],
     log: path.join(PATH_LOG, "picard/{sample}.metrics.log"),
     shell:
-        "picard -Xmx4g CollectHsMetrics "
+        "picard -Xmx16g CollectHsMetrics "
         "BAIT_INTERVALS={params.BAIT_INTERVALS} "
         "TARGET_INTERVALS={params.TARGET_INTERVALS} "
         "INPUT={input.coordsorted} "
@@ -281,10 +281,12 @@ rule AlignmentMetrics:
         AlignmentMetrics=path.join(PATH_QC, "AlignmentMetrics/{sample}_AlignmentMetrics.txt")
     params:
         ref=config["all"]["REF"]
+    conda:
+        "envs/picard.yaml"
     log:
         path.join(PATH_LOG, 'picard/{sample}.alignmetrics.log')
     shell:
-        "picard -Xmx4g CollectAlignmentSummaryMetrics "
+        "picard -Xmx16g CollectAlignmentSummaryMetrics "
         "R={params.ref} "
         "I={input.coordsorted} "
         "O={output.AlignmentMetrics} 2> {log}"
@@ -295,10 +297,12 @@ rule InsertsizeMetrics:
     output:
         InsertsizeMetrics=path.join(PATH_QC, "InsertsizeMetrics/{sample}_InsertsizeMetrics.txt"),
         Histogram=path.join(PATH_QC, "InsertsizeMetrics/{sample}_insertsize_histogram.pdf")
+    conda:
+        "envs/picard.yaml"
     log:
         path.join(PATH_LOG, 'picard/{sample}.insertsizemetrics.log')
     shell:
-        "picard -Xmx4g  CollectInsertSizeMetrics "
+        "picard -Xmx16g CollectInsertSizeMetrics "
         "I={input.coordsorted} "
         "H={output.Histogram} "
         "O={output.InsertsizeMetrics} 2> {log}"
@@ -326,139 +330,20 @@ rule Collect_Metrics:
         out = pd.concat(out)
         out.to_csv(output[0], index=False)
             
-
-#rule Metrics_table:
+#rule targetRegionFilter:
 #    input:
-#        expand(path.join(PATH_COV, '{sample}_merged.txt'), sample = AllFiles.keys())
+#        coordsorted=path.join(PATH_BAM, "{sample}_coordsorted.bam")
 #    output:
-#        path.join(PATH_COV, 'Metrics_allsample.txt')
-#    script:
-#        path.join(PATH_PIPELINE,'Collect_metrics.R')
+#        targetExonsBam=path.join(PATH_BAM, "{sample}_target_exons.bam"),
+#    params:
+#        targetExonsBed=config["all"]["target_bed"],
+#    conda:
+#        "envs/picard.yaml"
+#        "envs/samtools.yaml"
+#    log:
+#        path.join(PATH_LOG, 'target_region_filter/{sample}.log')
+#    shell:
+#        "samtools view -L {params.targetExonsBed} {input.coordsorted} -b -o {output.targetExonsBam} 2> {log}"
+#        "picard BuildBamIndex I={output.targetExonsBam} 2> {log}"
+#        "java -Xmx8G -jar picard BuildBamIndex I={output.CapTargetBam} 2> {log}"
 
-#TODO probably normalname and tumorname can be done in a nicer way - or rg group in bwa-mem should be different that it match the file name.
-rule Mutect2:
-	input:
-		tumor=lambda wildcards:"../bam/"+Tumor_samples[wildcards.tumor]+"_coordsorted.bam",
-		normal=lambda wildcards:"../bam/"+Normal_samples[pairs[wildcards.tumor]]+"_coordsorted.bam"
-	output:
-		vcf="../Mutect2/{tumor}.somatic.vcf.gz",
-		bamout="../Mutect2/{tumor}-N_m2.bam"
-	params:
-		ref=config["all"]["REF"],
-		snps=config["all"]["snps"],
-		#normalname=lambda wildcards:pairs[wildcards.tumor],
-		normalname=lambda wildcards:re.match('[a-zA-Z0-9\-]*', Normal_samples[pairs[wildcards.tumor]]).group(0),
-		tumorname=lambda wildcards:re.match('[a-zA-Z0-9\-]*',wildcards.tumor).group(0),
-		tmpdir=temp("../tmp"),
-	threads: config['all']['THREADS']
-	conda:
-		"envs/gatk4.yaml"
-	log: "../logs/Mutect2/{tumor}_mutect2.txt"
-	shell:
-		"gatk Mutect2 -R {params.ref} -I {input.tumor} -tumor {params.tumorname} -I {input.normal} -normal"
-		" {params.normalname} --germline-resource {params.snps} -O {output.vcf} -bamout {output.bamout} "
-		"--native-pair-hmm-threads {threads} --TMP_DIR {params.tmpdir} &> {log}"
-
-#Specify the case sample for somatic calling with two parameters. Provide the BAM with -I and the sample's read group sample name (the SM field value) with -tumor. To look up the read group SM field use GetSampleName. Alternatively, use samtools view -H tumor.bam | grep '@RG'.
-
-rule filtermutect2:
-	input:
-		vcf="../Mutect2/{tumor}.somatic.vcf.gz",
-	output:
-		filt="../Mutect2/{tumor}.somatic_filtered.vcf.gz"
-	conda:
-		"envs/gatk4.yaml"
-	log: "../logs/Mutect2/{tumor}_filtermutect2.txt"
-	shell:
-		"gatk FilterMutectCalls -V {input.vcf} -O {output.filt} &> {log} "
-
-
-rule SnpSift:
-	input:
-		filt="../Mutect2/{tumor}.somatic_filtered.vcf.gz"
-	output:
-		annotated="../vcf/annotated/{tumor}.annotated.vcf"
-	conda:
-		"envs/SnpSift.yaml"
-	params:
-		Java_mem=config["all"]["Java_mem"],
-		dbsnp=config["all"]["dbsnp"],
-		clinvar=config["all"]["clinvar"],
-		Cosmic=config["all"]["Cosmic"]
-	log:
-		"../logs/snpEff/{tumor}_annotation.txt"
-	shell:
-		"SnpSift annotate {params.Java_mem} {params.dbsnp} {input.filt} 2> {log} | "
-		"SnpSift annotate {params.Java_mem} {params.clinvar} -  2>> {log} | "
-		"SnpSift annotate {params.Java_mem} {params.Cosmic} - > {output.annotated} 2>> {log} "
-
-rule SnpEff:
-	input:
-		annotated="../vcf/annotated/{tumor}.annotated.vcf"
-	output:
-		effect="../vcf/annotated/{tumor}.annotated_effect.vcf",
-		snpEff_stats="../vcf/annotated/stats/{tumor}_stats.html"
-	conda:
-		"envs/snpeff.yaml"
-	params:
-		Java_mem=config["all"]["Java_mem"],
-		targets=config["all"]["targets"]
-	log:
-		"../logs/snpEff/{tumor}_snpEff.txt"
-	shell:
-		"snpEff {params.Java_mem} eff -filterInterval {params.targets} -v -canon -strict "
-		"-stats {output.snpEff_stats} hg19 {input.annotated} > {output.effect} 2> {log} "
-
-#TODO make params of SnpSift_filters instead of hardcoded
-rule SnpSift_filter:
-	input:
-		effect="../vcf/annotated/{tumor}.annotated_effect.vcf",
-	output:
-		highimpact="../vcf/filtered/{tumor}.high_impact.vcf",
-		lowimpact="../vcf/filtered/{tumor}.low_impact.vcf",
-		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.vcf"
-	params:
-		minimal_Alternative_depth=4
-	conda:
-		"envs/SnpSift.yaml"
-	shell:
-		"""
-		SnpSift filter -f {input.effect} "(GEN[1].AD[1] >= 4) & (GEN[0].AD[0] + GEN[0].AD[1] > 10) & (GEN[1].AD[0] + GEN[1].AD[1] > 10) & (FILTER='PASS') &  (GEN[1].F1R2[1] >= 1) & (GEN[1].F2R1[1] >= 1) & GEN[1].AF >= 0.05" > {output.all_evidenced} && \
-		SnpSift filter -f {output.all_evidenced} -n "(ANN[0].IMPACT='HIGH') | (ANN[0].IMPACT='MODERATE')" > {output.lowimpact} && \
-		SnpSift filter -f {output.all_evidenced} "((ANN[0].IMPACT='HIGH') | (ANN[0].IMPACT='MODERATE'))" > {output.highimpact}
-		"""
-
-rule SnpSift_csv:
-	input:
-		highimpact="../vcf/filtered/{tumor}.high_impact.vcf",
-		lowimpact="../vcf/filtered/{tumor}.low_impact.vcf",
-		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.vcf"
-	output:
-		highimpact="../vcf/filtered/{tumor}.high_impact.csv",
-		lowimpact="../vcf/filtered/{tumor}.low_impact.csv",
-		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.csv"
-	params:
-		fields='CHROM POS "ANN[0].GENE" REF ALT DP "GEN[0].AD" "GEN[1].AD" "GEN[0].AF" "GEN[1].AF" "ANN[0].IMPACT" \
-		"ANN[0].EFFECT" FILTER "GEN[1].F1R2" "GEN[1].F2R1" "GEN[1].MBQ" "GEN[1].MMQ" "ANN[0].HGVS_C" \
-		"ANN[0].HGVS_P" ID "COMMON" "RS" POP_AF "CAF"  "LOF" "NMD" "MUT" \
-		"CLNSIG" "ORIGIN" "SNP" "COSM.ID" "FATHMM" "MUT.ST"'
-	conda:
-		"envs/SnpSift.yaml"
-	shell:
-		"""
-		SnpSift extractFields -e "." {input.highimpact} {params.fields} > {output.highimpact} && \
-		SnpSift extractFields -e "." {input.lowimpact} {params.fields} > {output.lowimpact} && \
-		SnpSift extractFields -e "." {input.all_evidenced} {params.fields} > {output.all_evidenced}
-		"""
-
-#TODO add analysis such as MutationalPatterns, summary files, combining with copy numbers, Circosplots etc.
-# rule MutationalPatterns:
-# 	input:
-# 		all_evidenced="../vcf/filtered/{tumor}.all_evidenced.vcf",
-# 		script="scripts/Mutational_patterns.R"
-# 	output:
-# 		figure="../MutationalPatterns/mutationspectrum_96.png"
-# 	conda:
-# 		"envs/R.yaml"
-# 	script:
-# 		"{input.script}"

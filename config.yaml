@@ -1,29 +1,30 @@
 
 path:
-    fastq: 'fastq'
-    qc: 'qc'
-    bam: 'bam'
-    log: 'log'
-    covariance: 'CovMetrics'
-    temp: '/home/y.kim1/temp/'
+    fastq: '/home/m.mendeville/MPS-408/WES/fastq'
+#    fastq: '/net/nfs/PAT/analysis/MPS-408/WES/fastq'
+    trimmed: '/home/m.mendeville/PETAL/trimmed'
+    qc: '/home/m.mendeville/PETAL/qc'
+    bam: '/home/m.mendeville/PETAL/bam'
+    log: '/home/m.mendeville/PETAL/log'
+    covariance: '/home/m.mendeville/PETAL/CovMetrics'
+    temp: '/home/m.mendeville/temp/'
 
 platform:
     SRorPE: 'PE'
     prefix: ['_R1_001', '_R2_001']
 
+cutadapt:
+    adapter: ["AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC", #standard Illumena 
+              "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"]
 
 all:
-    REF: /net/nfs/PAT/home/tjitske/files/ref/GRch37/Homo_sapiens.GRCh37.69.dna_sm.primary_assembly.fa
-    #REF: /net/nfs/PAT/data/ref/hg19/ensembl/bwa-0.7.5a/Homo_sapiens.GRCh37.69.dna_sm.primary_assembly.fa #no chr prefix
-    #REF: /net/nfs/PAT/home/tjitske/files/ref/incl_chr/hg19.fa
-    #REF_NOCHR: /net/nfs/PAT/home/tjitske/files/ref/excl_chr/hg19_refgen_exclchr.fa
-    THREADS: 4
+    REF: /home/m.mendeville/data/ref/incl_chr/hg19.fa
+    THREADS: 24
     Java_mem: -Xmx4g
-    targets: manifest/MedExome_hg19_primary_coord.bed
-    bait_intervals: manifest/MedExome_hg19_bait_intervals_nochr.txt
-    target_intervals: manifest/MedExome_hg19_target_intervals_nochr.txt
-    #bait_intervals: manifest/MedExome_hg19_bait_intervals_chr_human.txt
-    #target_intervals: manifest/MedExome_hg19_target_intervals_chr_human.txt
+    targets: KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
+    bait_intervals: KAPA_New_Exome/KAPA_New_Exome_bait_intervals_HG19.txt
+    target_intervals: KAPA_New_Exome/KAPA_New_Exome_target_intervals_HG19.txt
+    #targets: manifest/MedExome_hg19_primary_coord.bed
     #dbsnp: "/net/nfs/PAT/home/tjitske/dbSNP/b151/All_20180423_Mutect2_AF.vcf.gz"  #dbSNP b151 excl chr
     dbsnp: /net/nfs/PAT/home/matias/dbSNP/b151/All_20180423.vcf.gz
     #snps: /net/nfs/PAT/home/tjitske/dbSNP/gnomAD/2.0.2/gnomad.exomes.r2.0.2-AF_chr.vcf.gz #gnomAD incl chr

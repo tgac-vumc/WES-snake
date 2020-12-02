@@ -19,7 +19,7 @@ PREFIX = config['platform']['prefix'] # prefix before "fastq.gz"
 
 
 ## obtain sample list ###########
-all_Samples=pd.read_csv('test_samples.tsv', sep='\t')
+all_Samples=pd.read_csv(config['path']['sampleList'], sep='\t')
 
 Tumor=list(all_Samples['Tumor']) # these are IDs, and use as the key to fetch files.
 Normal=list(all_Samples['Normal'])
@@ -93,6 +93,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             lambda wildcards: AllFiles[wildcards.sample][wildcards.R1R2]
         output:
             path.join(PATH_FASTQ, '{sample}.fastq.merged{R1R2}.gz')
+        threads: 10
         shell:
             "cat {input} > {output}"
 
@@ -106,7 +107,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             html2=path.join(PATH_QC, "fastqc", "{sample}.fastq.mergedR2_fastqc.html"),
             zip1=temp(path.join(PATH_QC, "fastqc", "{sample}.fastq.mergedR1_fastqc.zip")),
             zip2=temp(path.join(PATH_QC, "fastqc", "{sample}.fastq.mergedR2_fastqc.zip"))
-        threads:config['all']['THREADS']
+        threads: 1 #config['all']['THREADS']
         params:
             fastqc_dir=path.join(PATH_QC, "fastqc")
         conda:
@@ -143,7 +144,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             html2=path.join(PATH_QC,"fastqc","{sample}_R2_trim_fastqc.html"),
             zip1=temp(path.join(PATH_QC, "fastqc", "{sample}_R1_trim_fastqc.zip")),
             zip2=temp(path.join(PATH_QC, "fastqc", "{sample}_R2_trim_fastqc.zip")),
-        threads:config['all']['THREADS']
+        threads: 1 #config['all']['THREADS']
         conda:
             "envs/fastqc.yaml"
         params:
@@ -222,7 +223,6 @@ rule mark_duplicates:
     log: path.join(PATH_LOG, "mark_duplicates/{sample}.log"),
     params:
         tmpdir=PATH_TEMP
-    threads: config['all']['THREADS'],
     conda:
         "envs/picard.yaml"
     shell:
@@ -260,7 +260,7 @@ rule CollectHsMetrics:
         ref=config["all"]["REF"],
     conda:
         "envs/picard.yaml"
-    threads: config['all']['THREADS'],
+    threads:  1 #config['all']['THREADS'],
     log: path.join(PATH_LOG, "picard/{sample}.metrics.log"),
     shell:
         "picard -Xmx16g CollectHsMetrics "

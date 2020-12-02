@@ -1,13 +1,14 @@
 
 path:
-    fastq: '/home/m.mendeville/MPS-408/WES/fastq'
-#    fastq: '/net/nfs/PAT/analysis/MPS-408/WES/fastq'
-    trimmed: '/home/m.mendeville/PETAL/trimmed'
-    qc: '/home/m.mendeville/PETAL/qc'
-    bam: '/home/m.mendeville/PETAL/bam'
-    log: '/home/m.mendeville/PETAL/log'
-    covariance: '/home/m.mendeville/PETAL/CovMetrics'
-    temp: '/home/m.mendeville/temp/'
+    #    fastq: '/home/m.mendeville/MPS-408/WES/fastq'
+    fastq: '/net/nfs/PAT/analysis/MPS-409/WES/fastq'
+    trimmed: '/home/y.kim1/Projects/NKI-WES/trimmed/'
+    qc: '/home/y.kim1/Projects/NKI-WES/qc'
+    bam: '/home/y.kim1/Projects/NKI-WES/bam'
+    log: '/net/nfs/PAT/analysis/MPS-409/WES/log'
+    covariance: '/net/nfs/PAT/analysis/MPS-409/CovMetrics'
+    temp: '/home/y.kim1/temp/'
+    sampleList: 'sampleList.tsv'
 
 platform:
     SRorPE: 'PE'
@@ -18,12 +19,12 @@ cutadapt:
               "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"]
 
 all:
-    REF: /home/m.mendeville/data/ref/incl_chr/hg19.fa
+    REF: /home/Resource/fasta/hg19.chr.fa
     THREADS: 24
     Java_mem: -Xmx4g
-    targets: KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
-    bait_intervals: KAPA_New_Exome/KAPA_New_Exome_bait_intervals_HG19.txt
-    target_intervals: KAPA_New_Exome/KAPA_New_Exome_target_intervals_HG19.txt
+    targets: /home/Resource/KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
+    bait_intervals: /home/Resource/KAPA_New_Exome/KAPA_New_Exome_bait_intervals_HG19.txt
+    target_intervals: /home/Resource/KAPA_New_Exome/KAPA_New_Exome_target_intervals_HG19.txt
     #targets: manifest/MedExome_hg19_primary_coord.bed
     #dbsnp: "/net/nfs/PAT/home/tjitske/dbSNP/b151/All_20180423_Mutect2_AF.vcf.gz"  #dbSNP b151 excl chr
     dbsnp: /net/nfs/PAT/home/matias/dbSNP/b151/All_20180423.vcf.gz

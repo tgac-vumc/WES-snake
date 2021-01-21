@@ -2,13 +2,14 @@
 path:
     #    fastq: '/home/m.mendeville/MPS-408/WES/fastq'
     fastq: '/net/nfs/PAT/analysis/MPS-409/WES/fastq'
-    trimmed: '/home/y.kim1/Projects/NKI-WES/trimmed/'
-    qc: '/home/y.kim1/Projects/NKI-WES/qc'
-    bam: '/home/y.kim1/Projects/NKI-WES/bam'
+    variant: '/net/nfs/PAT/analysis/MPS-409/WES/variant'
+    copywriter: '/net/nfs/PAT/analysis/MPS-409/WES/copywriter'
+    qc: '/home/y.kim1/NKI-WES/qc'
+    bam: '/home/y.kim1/NKI-WES/bam'
     log: '/net/nfs/PAT/analysis/MPS-409/WES/log'
     covariance: '/net/nfs/PAT/analysis/MPS-409/CovMetrics'
     temp: '/home/y.kim1/temp/'
-    sampleList: 'sampleList.tsv'
+    sampleList: 'samplesList.matched.tsv'
 
 platform:
     SRorPE: 'PE'
@@ -19,21 +20,57 @@ cutadapt:
               "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"]
 
 all:
-    REF: /home/Resource/fasta/hg19.chr.fa
-    THREADS: 24
+    REF: /home/y.kim1/Resource/fasta/hg19.chr.fa
+    THREADS: 18 
     Java_mem: -Xmx4g
-    targets: /home/Resource/KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
-    bait_intervals: /home/Resource/KAPA_New_Exome/KAPA_New_Exome_bait_intervals_HG19.txt
-    target_intervals: /home/Resource/KAPA_New_Exome/KAPA_New_Exome_target_intervals_HG19.txt
-    #targets: manifest/MedExome_hg19_primary_coord.bed
-    #dbsnp: "/net/nfs/PAT/home/tjitske/dbSNP/b151/All_20180423_Mutect2_AF.vcf.gz"  #dbSNP b151 excl chr
+    targets: /home/y.kim1/Resource/KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
+    bait_intervals: /home/y.kim1/Resource/KAPA_New_Exome/KAPA_New_Exome_bait_intervals_HG19_reordered.txt
+    target_intervals: /home/y.kim1/Resource/KAPA_New_Exome/KAPA_New_Exome_target_intervals_HG19_reordered.txt
     dbsnp: /net/nfs/PAT/home/matias/dbSNP/b151/All_20180423.vcf.gz
-    #snps: /net/nfs/PAT/home/tjitske/dbSNP/gnomAD/2.0.2/gnomad.exomes.r2.0.2-AF_chr.vcf.gz #gnomAD incl chr
-    snps: /net/nfs/PAT/home/tjitske/dbSNP/gnomAD/2.0.2/gnomad.exomes.r2.0.2-AF.vcf.gz  #gnomAD excl chr
-    #snps: /net/nfs/PAT/home/tjitske/dbSNP/b151/All_20180423_Mutect2_AF_chr.vcf.gz  #dbSNP b151 incl chr
     clinvar: /net/nfs/PAT/home/matias/dbSNP/b151/clinvar_20180701.vcf.gz
-    #Cosmic: /net/nfs/PAT/home/matias/data/ref/cosmic/hg19_v84_2018/CosmicCodingMuts_BCNHLv2_v84_hg19.vcf
-    Cosmic: /net/nfs/PAT/home/matias/data/ref/cosmic/hg19_v84_2018/CosmicCodingMuts_Custom_v84_hg19.vcf
+    #Cosmic: /net/nfs/PAT/home/matias/data/ref/cosmic/hg19_v84_2018/CosmicCodingMuts_BCNHLv3_v84_hg19.vcf
+    Cosmic: /net/nfs/PAT/home/matias/data/ref/cosmic/hg19_v84_2018/CosmicCodingMuts_BCNHLv2_v84_hg19.vcf
+    gnomAD: /net/nfs/PAT/home/tjitske/dbSNP/gnomAD/2.0.2/retagged_gnomad.exomes.r2.0.2-AF.vcf.gz
+    HMF_PON: /net/nfs/PAT/home/matias/data/blacklist/HMF_PON/PON.vcf.gz
+    HG19_DICT: /home/y.kim1/Resource/fasta/hg19.chr.dict
+
+
 
 trim:
     min_len: 20
+
+
+LoFreq:
+    min_cov: 10
+    min_mq: 20
+    min_bq: 20
+    min_alt_bq: 20
+    max_depth: 1000
+    sig: 0.05
+    af_min: 0.05
+    cov_min: 15
+    sb_alpha: 0.05
+    #SnpSift_filter: "(DP4[2]>2) & (DP4[3]>2) & ((na HRUN) | (HRUN<8))"
+    BED_blacklist: manifests/PON_LoFreq_N24_min2POS_V2_ABRA2_200430.bed
+    Gene_blacklist: /net/nfs/PAT/home/matias/data/blacklist/hypervariable_gene_blacklist.bed
+
+
+
+Mutect2:
+    gnomad: /net/nfs/PAT/home/tjitske/dbSNP/gnomAD/2.0.2/gnomad.exomes.r2.0.2-AF_chr.vcf.gz
+    pon: "null"
+    interval: /home/y.kim1/Resource/KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
+    clustered: 50 
+    af_min: 0.05
+    reads_per_strand: 3
+    min_reads: 4
+    variants: /net/nfs/PAT/analysis/MPS-409/WES/tumor-only-snakemake/manifests/variants_for_contamination.vcf.gz
+    interval: /home/y.kim1/Resource/KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
+
+Funcotator:
+    datasource: /net/nfs/PAT/home/tjitske/files/funcotator_db/funcotator_dataSources.v1.7.20200521s
+    hg_version: hg19    #alternative is hg38 
+    file_format: VCF #alternative is MAF output file
+    transcriptlist: manifests/transcriptlist.txt
+
+

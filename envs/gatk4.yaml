@@ -2,4 +2,4 @@ channels:
     - conda-forge
     - bioconda
 dependencies:
-    - gatk4=4.0.6.0
+    - gatk4=4.1.7.0

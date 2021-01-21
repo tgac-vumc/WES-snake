@@ -18,6 +18,12 @@ PREFIX = config['platform']['prefix'] # prefix before "fastq.gz"
 #################################
 
 
+
+##### Configurations VariantDetection ######
+PATH_VAR = config['path']['variant']
+
+
+
 ## obtain sample list ###########
 all_Samples=pd.read_csv(config['path']['sampleList'], sep='\t')
 
@@ -64,14 +70,14 @@ pairs=dict(zip(Tumor, Normal)) # dictionary containing Tumorname as key and norm
 
 rule all:
     input:
-#        expand(path.join(PATH_COV, "{sample}_HSmetrics.txt"), sample=Tumor_samples.keys()),
-#        expand(path.join(PATH_COV, "{sample}_HSmetrics.txt"), sample=Normal_samples.keys()),
-#        path.join(PATH_COV, 'Metrics_allsample.txt')
-#       expand(path.join(PATH_QC, 'Combined/{sample}_Combined_metrics.txt'), sample=AllFiles.keys()),
         path.join(PATH_QC, 'Combined_Metrics.txt'),
-        expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim']) 
-        #expand("../vcf/filtered/{tumor}.all_evidenced.vcf", tumor=Tumor_samples.keys())
- 
+        expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim', '_bam']),
+        expand(path.join(PATH_QC, "ReadStats", "{sample}.reads.all"),
+            sample = Tumor+Normal),
+       #expand(path.join(PATH_VAR, 'LoFreq', '{sample}_somatic_final.snvs.vcf.gz'), sample=Tumor),
+       # expand(path.join(PATH_VAR, "Mutect2/vcf/filtered/{sample}_Mutect2_passed.vcf.gz"), sample=Tumor)
+       #expand("../vcf/filtered/{tumor}.all_evidenced.vcf", tumor=Tumor_samples.keys())
+        path.join(PATH_VAR, 'funcotated/merged.vcf')
 
 def getRGinfo(wildcards):
     fq=path.join(PATH_FASTQ, "trimmed", wildcards.sample+"_R1_trim.fq.gz")
@@ -84,6 +90,16 @@ def getRGinfo(wildcards):
     RGinfo="\'@RG\tID:"+lane+"\tSM:"+name+"\tPL:ILLUMINA\tLB:SeqCap\tPU:"+flowcell+"\'"
 
     return(RGinfo)
+
+def getNormalSample(wildcards):
+    normal = pairs[wildcards.sample]
+    name=re.match('[a-zA-Z0-9\-]*', normal).group(0)
+    return(name)
+
+def getTumorSample(wildcards):
+    name=re.match('[a-zA-Z0-9\-]*', wildcards.sample).group(0)
+    return(name)
+
 
 
 if PLATFORM in ['PE', 'pe']: # I only implement PE for now
@@ -140,15 +156,15 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             fq1=path.join(PATH_FASTQ, "trimmed", "{sample}_R1_trim.fq.gz"),
             fq2=path.join(PATH_FASTQ, "trimmed", "{sample}_R2_trim.fq.gz"),
         output:
-            html1=path.join(PATH_QC,"fastqc","{sample}_R1_trim_fastqc.html"),
-            html2=path.join(PATH_QC,"fastqc","{sample}_R2_trim_fastqc.html"),
-            zip1=temp(path.join(PATH_QC, "fastqc", "{sample}_R1_trim_fastqc.zip")),
-            zip2=temp(path.join(PATH_QC, "fastqc", "{sample}_R2_trim_fastqc.zip")),
+            html1=path.join(PATH_QC,"fastqc", "trimmed","{sample}_R1_trim_fastqc.html"),
+            html2=path.join(PATH_QC,"fastqc", "trimmed","{sample}_R2_trim_fastqc.html"),
+            zip1=temp(path.join(PATH_QC, "fastqc", "trimmed", "{sample}_R1_trim_fastqc.zip")),
+            zip2=temp(path.join(PATH_QC, "fastqc", "trimmed", "{sample}_R2_trim_fastqc.zip")),
         threads: 1 #config['all']['THREADS']
         conda:
             "envs/fastqc.yaml"
         params:
-            fastqc_dir=path.join(PATH_QC, "fastqc")
+            fastqc_dir=path.join(PATH_QC, "fastqc", "trimmed")
         log: path.join(PATH_LOG, "fastqc","{sample}.trim.log")
         shell:
             "fastqc {input.fq1} {input.fq2} --outdir {params.fastqc_dir} --threads {threads} 2> {log}"
@@ -168,7 +184,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
 
     rule multiqc_trim:
         input:
-            expand(path.join(PATH_QC, "fastqc", "{sample}{pair}_trim_fastqc.zip"),
+            expand(path.join(PATH_QC, "fastqc", "trimmed", "{sample}{pair}_trim_fastqc.zip"),
                             pair=['_R1','_R2'], sample=AllFiles.keys())
         output:
             path.join(PATH_QC,'multiqc_trim.html') # empty wildcard allowed
@@ -247,6 +263,49 @@ rule Sambamba_sort2:
         #"picard BuildBamIndex I={output.coordsorted} 2>> {log}"                      #change? samtools
 
 
+rule ReadsStats:
+    input:
+        bam=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+    output:
+        path.join(PATH_QC, "ReadStats", "{sample}.reads.all")
+    params:
+        outdir = path.join(PATH_QC, "ReadStats"),
+        path_snakemake = srcdir('.')
+    shell:
+        """
+        {params.path_snakemake}/scripts/stats.sh {input.bam} {wildcards.sample} {params.outdir} {output}
+        """
+
+rule fastqc_bam:
+    input:
+        bam=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+    output:
+        bamqc = path.join(PATH_QC, "fastqc", "bam", "{sample}_coordsorted_fastqc.html"),
+        bamqczip = path.join(PATH_QC, "fastqc", "bam", "{sample}_coordsorted_fastqc.zip")
+    threads: 1 #config['all']['THREADS']
+    params:
+        fastqc_dir=path.join(PATH_QC, "fastqc", "bam")
+    conda:
+        "envs/fastqc.yaml"
+    log: path.join(PATH_LOG, "fastqc","{sample}.bam.log")
+    shell:
+        "fastqc {input.bam} --bam_mapped --outdir {params.fastqc_dir} --threads {threads} 2> {log}"  #Java??
+
+
+
+rule multiqc_bam:
+        input:
+            expand(path.join(PATH_QC, "fastqc", "bam", "{sample}_coordsorted_fastqc.zip"),
+                            sample=AllFiles.keys())
+        output:
+            path.join(PATH_QC,'multiqc_bam.html') # empty wildcard allowed
+        log:
+            path.join(PATH_LOG,'multiqc_bam.log')
+        wrapper:
+            '0.35.0/bio/multiqc'
+
+
+
 rule CollectHsMetrics:
     input:
         coordsorted=path.join(PATH_BAM, "{sample}_coordsorted.bam"),
@@ -278,7 +337,7 @@ rule AlignmentMetrics:
     input:
         coordsorted=path.join(PATH_BAM, "{sample}_coordsorted.bam")
     output:
-        AlignmentMetrics=path.join(PATH_QC, "AlignmentMetrics/{sample}_AlignmentMetrics.txt")
+        AlignmentMetrics=path.join(PATH_QC, "AlignmentMetrics","{sample}_AlignmentMetrics.txt")
     params:
         ref=config["all"]["REF"]
     conda:
@@ -302,10 +361,10 @@ rule InsertsizeMetrics:
     log:
         path.join(PATH_LOG, 'picard/{sample}.insertsizemetrics.log')
     shell:
-        "picard -Xmx16g CollectInsertSizeMetrics "
-        "I={input.coordsorted} "
-        "H={output.Histogram} "
-        "O={output.InsertsizeMetrics} 2> {log}"
+        """picard -Xmx16g CollectInsertSizeMetrics I={input.coordsorted} H={output.Histogram} O={output.InsertsizeMetrics} 2> {log} 
+
+        [[ ! -f "{output.InsertsizeMetrics}" ]] && echo "" > {output.InsertsizeMetrics} fi
+        [[ ! -f "{output.Histogram}" ]] && echo "" > {output.Histogram} fi"""
 
 
 rule Metrics:
@@ -313,10 +372,11 @@ rule Metrics:
         HSmetrics=path.join(PATH_QC, "HSMetrics/{sample}_HSmetrics.txt"),
         AlignmentMetrics=path.join(PATH_QC, "AlignmentMetrics/{sample}_AlignmentMetrics.txt"),
         InsertsizeMetrics=path.join(PATH_QC, "InsertsizeMetrics/{sample}_InsertsizeMetrics.txt"),
+        readStat=path.join(PATH_QC, "ReadStats", "{sample}.reads.all")
     output:
         combined=path.join(PATH_QC, "Combined/{sample}_Combined_metrics.txt")
     script:
-        path.join(PATH_PIPELINE, 'WES_Combine_metrics.R')
+        path.join(PATH_PIPELINE, 'scripts', 'WES_Combine_metrics.R')
 
 rule Collect_Metrics:
     input:
@@ -330,20 +390,306 @@ rule Collect_Metrics:
         out = pd.concat(out)
         out.to_csv(output[0], index=False)
             
-#rule targetRegionFilter:
-#    input:
-#        coordsorted=path.join(PATH_BAM, "{sample}_coordsorted.bam")
-#    output:
-#        targetExonsBam=path.join(PATH_BAM, "{sample}_target_exons.bam"),
-#    params:
-#        targetExonsBed=config["all"]["target_bed"],
-#    conda:
-#        "envs/picard.yaml"
-#        "envs/samtools.yaml"
-#    log:
-#        path.join(PATH_LOG, 'target_region_filter/{sample}.log')
-#    shell:
-#        "samtools view -L {params.targetExonsBed} {input.coordsorted} -b -o {output.targetExonsBam} 2> {log}"
-#        "picard BuildBamIndex I={output.targetExonsBam} 2> {log}"
-#        "java -Xmx8G -jar picard BuildBamIndex I={output.CapTargetBam} 2> {log}"
+
+
+############## VARIANT DETECTION #################
+
+
+rule LoFreq:
+    input:
+        normal = lambda wildcards: path.join(PATH_BAM, pairs[wildcards.sample] + '_coordsorted.bam'),
+        tumor=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+    output:
+        snps=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.snvs.vcf.gz"),
+        indels=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.indels.vcf.gz")
+    params:
+        ref=config["all"]["REF"],
+        threads=config["all"]["THREADS"],
+        min_cov=config["LoFreq"]["min_cov"],
+        min_mq=config["LoFreq"]["min_mq"],
+        min_bq=config["LoFreq"]["min_bq"],
+        min_alt_bq=config["LoFreq"]["min_alt_bq"],
+        max_depth=config["LoFreq"]["max_depth"],
+        sig=config["LoFreq"]["sig"],
+        prefix=path.join(PATH_VAR, "LoFreq", "{sample}_")
+    conda:
+        path.join(PATH_PIPELINE, "envs", "lofreq.yaml")
+    log: path.join(PATH_LOG, "LoFreq", "{sample}_lofreq.txt")
+    shell:
+        """
+        lofreq somatic \
+          -n {input.normal} -t {input.tumor} -f {params.ref} -o {params.prefix} \
+        --min-cov {params.min_cov} \
+        --threads {params.threads} --call-indels --verbose \
+        2> {log}
+        """
+
+rule LoFreq_combine:
+    input:
+        snps=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.snvs.vcf.gz"),
+        indels=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.indels.vcf.gz")
+    output:
+        tmp=temp(path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.combined.tmp.vcf")),
+        out=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.combined.vcf")
+    conda:
+        "envs/lofreq.yaml"
+    shell:
+        """
+        vcfcombine {input.snps} {input.indels} > {output.tmp} && 
+        sed 's/\%//' {output.tmp} | sed 's/FREQ\,Number\=1\,Type\=String/FREQ\,Number\=1\,Type\=Float/' > {output.out}
+        """
+
+
+rule LoFreq_readStatFilter:
+    input:
+        raw_vcf=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.combined.vcf")
+    output:
+        tmp_vcf=temp(path.join(PATH_VAR, "LoFreq/filtered/{sample}_lofreq_tmp.vcf")),
+        unsorted_vcf=path.join(PATH_VAR, "LoFreq/filtered/{sample}_lofreq_unsorted.vcf"),
+        filtered_vcf=path.join(PATH_VAR, "LoFreq/filtered/{sample}_lofreq_filt.vcf"),
+    params:
+        af_min=config["LoFreq"]["af_min"],
+        cov_min=config["LoFreq"]["cov_min"],
+        sb_alpha=config["LoFreq"]["sb_alpha"],
+        #SnpSift_filter=config["LoFreq"]["SnpSift_filter"],
+        hg19_dict=config["all"]["HG19_DICT"],
+    conda:
+        "envs/lofreq.yaml"
+    log: path.join(PATH_LOG, "LoFreq/{sample}_lofreq_readStatFilter.txt")
+    shell:
+        """
+        lofreq filter --verbose --af-min {params.af_min} --cov-min {params.cov_min} --sb-alpha {params.sb_alpha} --sb-incl-indels -i {input.raw_vcf} -o {output.tmp_vcf}
+        SnpSift filter -f {output.tmp_vcf} "(DP4[2]>2) & (DP4[3]>2) & ((na HRUN) | (HRUN<8))" > {output.unsorted_vcf}
+        picard SortVcf I={output.unsorted_vcf} O={output.filtered_vcf} SD={params.hg19_dict} 2> {log}
+        """
+
+rule zip_vcf:
+    input:
+        path.join(PATH_VAR, 'LoFreq/filtered/{sample}.vcf')
+    output:
+        vcf=path.join(PATH_VAR, 'LoFreq/filtered/{sample}.vcf.gz'),
+        idx=path.join(PATH_VAR, 'LoFreq/filtered/{sample}.vcf.gz.tbi')
+    shell:
+        """
+        bgzip -c {input} > {output.vcf}
+        tabix -p vcf {output.vcf}
+        """
+
+
+rule Mutect2:
+    input:
+        normal=lambda wildcards: path.join(PATH_BAM, pairs[wildcards.sample] + '_coordsorted.bam'),
+        tumor=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+    output:
+        raw=path.join(PATH_VAR, "Mutect2/{sample}_Mutect2.vcf"),
+        f1r2=path.join(PATH_VAR, "Mutect2/{sample}_f1r2.tar.gz")
+    params:
+        ref=config["all"]["REF"],
+        pon=config["Mutect2"]["pon"],
+        gnomad=config["Mutect2"]["gnomad"],
+        interval=config["Mutect2"]["interval"],
+        normal=getNormalSample,
+        tumor=getTumorSample
+    conda: "envs/gatk4.yaml"
+    threads: config["all"]["THREADS"]
+    log:	path.join(PATH_LOG, "Mutect2/{sample}_mutect2.txt")
+    shell:
+        """
+        gatk Mutect2 -R {params.ref} -I {input.normal} -I {input.tumor} \
+        -O {output.raw} --normalsample {params.normal} --tumor_sample {params.tumor} \
+        --germline-resource {params.gnomad} \
+        -pon {params.pon} -L {params.interval} --f1r2-tar-gz {output.f1r2} --max-mnp-distance 0 --native-pair-hmm-threads {threads} 2> {log}
+        """
+
+
+#pass this raw mutect data to LearnReadOrientationModel - to be able to filter on orientation bias
+rule LearnReadOrientationModel:
+    input:
+        f1r2=path.join(PATH_VAR, "Mutect2/{sample}_f1r2.tar.gz")
+    output:
+        obmodel=path.join(PATH_VAR, "Mutect2/{sample}_read-orientation-model.tar.gz")
+    conda:
+        "envs/gatk4.yaml"
+    log:
+        path.join(PATH_LOG, "Mutect2/{sample}_mutect2_orientation.txt")
+    shell:
+        """
+        gatk LearnReadOrientationModel -I {input.f1r2} -O {output.obmodel} 2> {log}
+        """
+
+# this is to determine contamination
+rule CalculateContamination:
+    input:
+        exonbam=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+    output:
+        pileup=temp(path.join(PATH_VAR, "Mutect2/{sample}_getpileupsummaries.table")),
+        segments=path.join(PATH_VAR, "Mutect2/{sample}_segments.table"),
+        contamination=path.join(PATH_VAR, "Mutect2/{sample}_calculatecontamination.table")
+    params:
+        variants=config["Mutect2"]["variants"],
+        interval=config["Mutect2"]["interval"],
+    conda:
+        "envs/gatk4.yaml"
+    log: 
+        path.join(PATH_LOG, "Mutect2/{sample}_mutect2.txt")
+    shell:
+        "gatk GetPileupSummaries -I {input.exonbam} -O {output.pileup} -V {params.variants} -L {params.interval} 2>> {log} &&"
+        "gatk CalculateContamination -I {output.pileup} -tumor-segmentation {output.segments} -O {output.contamination} 2>> {log}"
+
+
+#pass the learned read orientation model and contaminationtable in FilterMutectCalls
+rule FilterMutectCalls:
+    input: 
+        raw=path.join(PATH_VAR, "Mutect2/{sample}_Mutect2.vcf"),
+        obmodel=path.join(PATH_VAR, "Mutect2/{sample}_read-orientation-model.tar.gz"),
+        segments=path.join(PATH_VAR, "Mutect2/{sample}_segments.table"),
+        contamination=path.join(PATH_VAR, "Mutect2/{sample}_calculatecontamination.table"),
+    output:
+        filtered=path.join(PATH_VAR, "Mutect2/filtered/{sample}_Mutect2_filt.vcf"),
+    params:
+        ref=config["all"]["REF"],
+        events=config["Mutect2"]["clustered"],      #50		#this is for the clustered events, default =2 but than artifacts cause that real events are filtered and SHM is filtered out
+        af_min=config["Mutect2"]["af_min"],
+        reads= config["Mutect2"]["reads_per_strand"],	
+        min_reads= config["Mutect2"]["min_reads"],	
+    conda:
+        "envs/gatk4.yaml"
+    log: 
+        path.join(PATH_LOG, "Mutect2/{sample}_mutect2.txt")
+    shell:
+        """
+        gatk FilterMutectCalls -V {input.raw} -R {params.ref} \
+        --max-events-in-region {params.events} --min-allele-fraction {params.af_min} \
+        --tumor-segmentation {input.segments} --contamination-table {input.contamination} \
+        --min-reads-per-strand {params.reads} --unique-alt-read-count {params.min_reads} \
+        --ob-priors {input.obmodel} -O {output.filtered} 2>> {log} 
+        """
+
+rule Mutect_passed: 
+    input:
+        filtered=path.join(PATH_VAR, "Mutect2/filtered/{sample}_Mutect2_filt.vcf"),
+    output:
+        passed=path.join(PATH_VAR, "Mutect2/filtered/{sample}_Mutect2_passed.vcf"),
+        pass_csv=path.join(PATH_VAR, "Mutect2/filtered/{sample}_Mutect2_passed.csv"),
+        passed_gz=path.join(PATH_VAR, "Mutect2/filtered/{sample}_Mutect2_passed.vcf.gz"),
+    params:
+        fields='CHROM POS REF ALT DP "GEN[0].AF" "GEN[0].F1R2" "GEN[0].F2R1" FILTER',
+    conda: 
+        "envs/SnpSift.yaml"
+    shell:
+        """
+        SnpSift filter -f {input.filtered} "(FILTER = 'PASS' & (ROQ > 20 | TLOD > 20))" > {output.passed} &&
+        SnpSift extractFields -e "." {output.passed} {params.fields}> {output.pass_csv} &&
+        pbgzip -c {output.passed} > {output.passed_gz} &&
+        tabix -s1 -b2 -e2 {output.passed_gz}
+        """
+
+
+rule Intersect_VariantCalls:
+    input:
+        lofreq_vcf=path.join(PATH_VAR, "LoFreq/filtered/{sample}_lofreq_filt.vcf.gz"),
+        Mutect2_vcf=path.join(PATH_VAR, "Mutect2/filtered/{sample}_Mutect2_passed.vcf.gz"),
+    output:
+        intersect_vcf=path.join(PATH_VAR, "intersect/{sample}_intersect.vcf"),
+        outersect_vcf=path.join(PATH_VAR, "intersect/{sample}_outersect.vcf")
+    conda:
+        "envs/SnpSift.yaml"
+    log: path.join(PATH_LOG, "Intersect_variantCalls/{sample}_intersectCalls.txt")  
+    shell:
+        """
+        bcftools isec -n=2 -w1 {input.Mutect2_vcf} {input.lofreq_vcf} -o {output.intersect_vcf} -O v 2> {log}
+        bcftools isec {input.Mutect2_vcf} {input.lofreq_vcf} -c all -n +0 -o {output.outersect_vcf} -O v 2>> {log}
+        """
+
+rule Annotate_VariantCalls:
+    input:
+        intersect_vcf=path.join(PATH_VAR, "intersect/{sample}_intersect.vcf")
+    output:
+        annotated=path.join(PATH_VAR, "annotated/{sample}.annotated.vcf")
+    params:
+        Java_mem=config["all"]["Java_mem"],
+        dbsnp=config["all"]["dbsnp"],
+        clinvar=config["all"]["clinvar"],
+        Cosmic=config["all"]["Cosmic"],
+        gnomAD=config["all"]["gnomAD"],
+        HMF_PON=config["all"]["HMF_PON"],
+    conda:
+        "envs/SnpSift.yaml"
+    log:
+        path.join(PATH_LOG, "Annotate_variantCalls/{sample}_annotation.txt")
+    shell:
+        """
+        SnpSift annotate {params.Java_mem} -v {params.Cosmic} {input.intersect_vcf} 2>> {log} |
+        SnpSift annotate {params.Java_mem} -v -info 'gnomAD_AF' {params.gnomAD} - 2>> {log} |
+        SnpSift annotate {params.Java_mem} -v -info 'PON_COUNT' {params.HMF_PON} - > {output.annotated} 2>> {log}
+        """
+
+
+rule Funcotator:
+    input:
+        annotated=path.join(PATH_VAR, "annotated/{sample}.annotated.vcf"),
+    output:
+        funcotated=path.join(PATH_VAR, "funcotated/{sample}_funcotated.vcf"),
+    params:
+        datasource=config["Funcotator"]["datasource"],
+        ref=config["all"]["REF"],
+        version=config["Funcotator"]["hg_version"],
+        file_format=config["Funcotator"]["file_format"],
+#        transcriptlist=config["Funcotator"]["transcriptlist"],
+    conda:
+        "envs/gatk4.yaml"
+    log:	
+        path.join(PATH_LOG, "Funcotator/{sample}_funcotator.txt")
+    shell:
+        """
+        gatk Funcotator \
+     		--variant {input.annotated}\
+        	--reference {params.ref} \
+     		--ref-version {params.version} \
+        	--data-sources-path {params.datasource} \
+     		--output {output.funcotated} \
+     		--output-file-format {params.file_format} 2>> {log}
+        """
+
+rule merge_vcf:
+    input:
+        expand(path.join(PATH_VAR, 'funcotated/{sample}_funcotated.vcf'), sample=Tumor)
+    output:
+        path.join(PATH_VAR, 'funcotated/merged.vcf')
+    conda:
+        "envs/lofreq.yaml"
+    log: path.join(PATH_LOG, "merge_vcfs/funcotated.txt")  
+    shell:
+        """
+        vcfcombine {input} > {output} 2> {log}
+        """
+
+
+
+rule ExtractVcfFields_csv:
+    input:
+        funcotated=path.join(PATH_VAR, "funcotated/{sample}_funcotated.vcf"),
+    output:
+        tmp_csv_snpsift=temp(path.join(PATH_VAR, "funcotated/{sample}_ann.csv")),
+        tmp_csv_func=temp(path.join(PATH_VAR, "funcotated/{sample}_func.csv")),
+        funcotated_csv=temp(path.join(PATH_VAR, "funcotated/{sample}_funcotated_org_head.csv")),
+    params:
+        fields='CHROM POS REF ALT DP "GEN[0].F1R2" "GEN[0].F2R1" "GEN[0].AF" \
+        AS_SB_TABLE "GEN[0].SB" GERMQ MBQ MFRL MMQ MPOS ROQ RPA RU STRQ STR SEQQ \
+            STRANDQ  TLOD COSM.ID AA CDS FATHMM MUT.ST SNP PON PON_COUNT POPAF gnomAD_AF',
+    conda:
+        "envs/SnpSift.yaml"
+    shell:
+        """
+        SnpSift extractFields -e "." {input.funcotated} {params.fields} > {output.tmp_csv_snpsift} &&
+        ./scripts/createFuncotationCsvFromFuncotatorVcf.sh {input.funcotated} > {output.tmp_csv_func} &&
+        paste {output.tmp_csv_snpsift} {output.tmp_csv_func} > {output.funcotated_csv}
+        """		
+
+
+
+	#TODO when a table is empty an error occurs and no output is created - maybe create if? 
+	#TODO PON_COUNT < 4 is not recognized correctly, it seems 25 is counted as 2.5 or something like that. if -I is not used F1R2 is not recognized as comma separated list but as decimal value. quick fix is to filter PON_COUNT > 4 out in mutation_overviews.
+# (SNP is null OR SNP = 'false') AND - removed this, because its from the Cosmic db and less reliable
+
 

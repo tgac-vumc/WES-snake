@@ -3,3 +3,9 @@ channels:
     - bioconda
 dependencies:
     - snpsift == 4.3.1t
+    - snpeff == 4.3.1t
+    - picard=2.15.0
+    - pbgzip=2016.08.04
+    - tabix=0.2.5
+    - bcftools=1.9
+    - vcftools==0.1.16

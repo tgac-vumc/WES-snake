@@ -1,0 +1,124 @@
+---
+title: Overview of mutation
+
+---
+
+
+```{r setup}
+library(vcfR)
+library(ggplot2)
+library(reshape2)
+library(pheatmap)
+library(RColorBrewer)
+library(org.Hs.eg.db)
+```
+
+```{r load_data, cache=T, cache.lazy=FALSE}
+
+vcf_file <- '../../variant/funcotated/merged.vcf'
+dna_file <- '/home/y.kim1/Resource/fasta/hg19.chr.fa'
+gff_file <- '/home/y.kim1/Resource/fasta/GRCh37_latest_genomic.gff'
+
+
+vcf <- read.vcfR(vcf_file)
+dna <- ape::read.dna(dna_file, format='fasta')
+gff <- read.table(gff_file, sep='\t', quote="")
+```
+
+```{r otherplot, fig.width=10, fig.height=10}
+
+pairs = read.table('../../samplesList.matched.tsv', header=T)
+tumors = unlist(lapply(pairs$Tumor, function(x) strsplit(x, '_')[[1]][1]))
+tumors <- setdiff(tumors, grep('sample-44', tumors, value=T))
+
+dp <- extract.gt(vcf, element="DP", as.numeric =T)
+dp <- dp[,tumors]
+dpf <- melt(dp, varnames=c("Index", "Sample"), value.name="Depth", na.rm=T)
+dpf <- dpf[dpf$Depth > 0, ]
+
+ggplot(dpf, aes(x=Sample, y=Depth)) + geom_violin(fill="#C0C0C0", adjust=1, scale="count", trim=T) +
+    theme_bw() + ylab("Read Depth (DP)") + theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 60, hjust = 1)) +
+    stat_summary(fun.data=mean_sdl, geom="pointrange", color="black") +
+    scale_y_continuous(trans=scales::log2_trans(), breaks=c(1, 10, 100, 1000))
+
+
+heatmap.bp(dp)
+
+
+dp <- extract.gt(vcf, element="AF", as.numeric =T)
+dp <- dp[, tumors]
+dpf <- melt(dp, varnames=c("Index", "Sample"), value.name="AF", na.rm=T)
+dpf <- dpf[dpf$AF > 0, ]
+
+ggplot(dpf, aes(x=Sample, y=AF)) + geom_violin(fill="#C0C0C0", adjust=1, scale="count", trim=T) +
+    theme_bw() + ylab("Allele frequency (AF)") + theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 60, hjust = 1)) +
+    stat_summary(fun.data=mean_sdl, geom="pointrange", color="black") 
+
+
+```
+
+```{r frequent_mutation, fig.width=12, fig.height=7}
+
+info = getINFO(vcf)
+info.frame <- data.frame()
+for(i  in 1:length(info)) {
+    info.frame = rbind(info.frame,
+                       strsplit(info[[i]], split="|", fixed=T)[[1]]
+                       )
+}
+colnames(info.frame) <- 1:ncol(info.frame)
+
+gene_col <- grep("ENSG", info.frame[1,])[1]
+trans_col <- grep("ENST", info.frame[1,])[1]
+type_col <- grep("g.chr*>*", info.frame[1,])[1]
+mttype_col <- which(apply(info.frame, 2, function(x) length(grep("MISSENSE", x))>0))[1]
+
+info.frame <- info.frame[, c(type_col, mttype_col, gene_col, trans_col)]
+colnames(info.frame) <- c('Mutation', 'Effect', 'GeneID', 'TranscriptID')
+info.frame$Symbol <- unlist(lapply(
+                mapIds(org.Hs.eg.db, keys=info.frame$GeneID, keytype="ENSEMBL", column='SYMBOL', multiVals='first'),
+                function(x) if (length(x)==0){NA} else {x}
+                ))
+
+#genes = c("TP53", "PIK3CA", "MYC", "ERBB2", "CCND1", "PTEN", "FGFR1", "GATA3", "RB1", "MAP3K1", "MAP2K4", "CDKN2A", "MLLT4", "AKT1", "ARID1A", "ARID1B", "CDH1", "MLL3", "ZNF217", "MLLT4", "FBXW7")
+
+genes = names(which(sort(table(unlist(info.frame$Symbol)), decreasing=T)>1))
+
+af <- extract.gt(vcf, element="AF", as.numeric=T)
+af <- af[,tumors]
+
+df <- matrix(0, nrow=length(genes), ncol=ncol(af), dimnames=list(genes, colnames(af)))
+df.count <- data.frame(gene=factor(genes, levels=genes), count=NA)
+for(gene in genes) {
+    ind = which(info.frame$Symbol==gene)
+    if (length(ind)>1){
+        df[gene,] <- colSums(af[ind, ]>0, na.rm=T)
+    }else if (length(ind)==1){
+        df[gene,] <- af[ind,]>0
+    }
+    df.count$count[df.count$gene == gene] = length(ind)
+}
+
+df[is.na(df)] = 0
+
+ggplot(df.count, aes(x=gene, y=count)) + geom_bar(stat='identity') + ylab('# of unique mutation') + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1, vjust=))
+df.count <- data.frame(gene = factor(rownames(df), levels=genes), count = rowSums(df>0))
+ggplot(df.count, aes(x=gene, y=count)) + geom_bar(stat='identity') + ylab('# of samples with mutation') + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1, vjust=))
+
+pheatmap(t(df), color = colorRampPalette(brewer.pal(n=7, name="YlOrRd"))(100))  
+
+
+write.table(cbind(getFIX(vcf, getINFO=T), info.frame, af), 'MutationList.csv', sep='\t', quote=F, col.names=T, row.names=F)
+
+
+```
+
+
+
+```{r chromR_plot, fig.width=10, fig.height=15}
+
+chrom <- create.chromR(name = "Overview", vcf=vcf, seq=dna, ann=gff)
+chrom <- proc.chromR(chrom)
+chromoqc(chrom)
+```
+

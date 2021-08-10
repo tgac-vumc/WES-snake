@@ -71,9 +71,9 @@ pairs=dict(zip(Tumor, Normal)) # dictionary containing Tumorname as key and norm
 rule all:
     input:
         path.join(PATH_QC, 'Combined_Metrics.txt'),
-        expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim', '_bam']),
-        expand(path.join(PATH_QC, "ReadStats", "{sample}.reads.all"),
-            sample = Tumor+Normal),
+        #expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim', '_bam']),
+        #expand(path.join(PATH_QC, "ReadStats", "{sample}.reads.all"),
+        #    sample = Tumor+Normal),
        #expand(path.join(PATH_VAR, 'LoFreq', '{sample}_somatic_final.snvs.vcf.gz'), sample=Tumor),
        # expand(path.join(PATH_VAR, "Mutect2/vcf/filtered/{sample}_Mutect2_passed.vcf.gz"), sample=Tumor)
        #expand("../vcf/filtered/{tumor}.all_evidenced.vcf", tumor=Tumor_samples.keys())
@@ -271,6 +271,8 @@ rule ReadsStats:
     params:
         outdir = path.join(PATH_QC, "ReadStats"),
         path_snakemake = srcdir('.')
+    conda:
+            "envs/bwa-mem.yaml"
     shell:
         """
         {params.path_snakemake}/scripts/stats.sh {input.bam} {wildcards.sample} {params.outdir} {output}
@@ -325,6 +327,7 @@ rule CollectHsMetrics:
         "picard -Xmx16g CollectHsMetrics "
         "BAIT_INTERVALS={params.BAIT_INTERVALS} "
         "TARGET_INTERVALS={params.TARGET_INTERVALS} "
+        "--CIVERAGE_CAP=10000 " # to go beyond 200 reads
         "INPUT={input.coordsorted} "
         "OUTPUT={output.HSmetrics} "
         "METRIC_ACCUMULATION_LEVEL=ALL_READS "
@@ -362,9 +365,12 @@ rule InsertsizeMetrics:
         path.join(PATH_LOG, 'picard/{sample}.insertsizemetrics.log')
     shell:
         """picard -Xmx16g CollectInsertSizeMetrics I={input.coordsorted} H={output.Histogram} O={output.InsertsizeMetrics} 2> {log} 
+	touch -a {output.InsertsizeMetrics}
+	touch -a {output.Histogram}
+	"""
 
-        [[ ! -f "{output.InsertsizeMetrics}" ]] && echo "" > {output.InsertsizeMetrics} fi
-        [[ ! -f "{output.Histogram}" ]] && echo "" > {output.Histogram} fi"""
+#        [[ ! -f "{output.InsertsizeMetrics}" ]] && echo "" > {output.InsertsizeMetrics} fi
+#        [[ ! -f "{output.Histogram}" ]] && echo "" > {output.Histogram} fi"""
 
 
 rule Metrics:
@@ -383,11 +389,16 @@ rule Collect_Metrics:
         expand(path.join(PATH_QC, "Combined/{sample}_Combined_metrics.txt"), sample = AllFiles.keys())
     output:
         path.join(PATH_QC, "Combined_Metrics.txt")
+    params:
+        columns = ['SAMPLE', 'TOTALREADS', 'Q37_READS', 'PF_UNIQUE_READS', 'PCT_PF_UQ_READS', 'MEAN_TARGET_COVERAGE',
+                'MEDIAN_TARGET_COVERAGE', 'PCT_USABLE_BASES_ON_TARGET', 'PCT_TARGET_BASES_30X', 'PCT_TARGET_BASES_100X', 'PCT_CHIMERAS',
+                'MEAN_READ_LENGTH', 'MEDIAN_INSERT_SIZE', 'PCT_EXC_DUPE', 'PCT_EXC_OVERLAP', 'PCT_EXC_OFF_TARGET']
     run:
         out = list() 
         for f in input:
             out.append(pd.read_csv(f, sep=' '))
         out = pd.concat(out)
+        out = out[params.columns]
         out.to_csv(output[0], index=False)
             
 
@@ -435,6 +446,8 @@ rule LoFreq_combine:
         "envs/lofreq.yaml"
     shell:
         """
+	tabix -f {input.snps} &&
+	tabix -f {input.indels} &&
         vcfcombine {input.snps} {input.indels} > {output.tmp} && 
         sed 's/\%//' {output.tmp} | sed 's/FREQ\,Number\=1\,Type\=String/FREQ\,Number\=1\,Type\=Float/' > {output.out}
         """
@@ -469,6 +482,8 @@ rule zip_vcf:
     output:
         vcf=path.join(PATH_VAR, 'LoFreq/filtered/{sample}.vcf.gz'),
         idx=path.join(PATH_VAR, 'LoFreq/filtered/{sample}.vcf.gz.tbi')
+    conda:
+        "envs/lofreq.yaml"
     shell:
         """
         bgzip -c {input} > {output.vcf}
@@ -496,7 +511,7 @@ rule Mutect2:
     shell:
         """
         gatk Mutect2 -R {params.ref} -I {input.normal} -I {input.tumor} \
-        -O {output.raw} --normalsample {params.normal} --tumor_sample {params.tumor} \
+        -O {output.raw} --normal-sample {params.normal} --tumor-sample {params.tumor} \
         --germline-resource {params.gnomad} \
         -pon {params.pon} -L {params.interval} --f1r2-tar-gz {output.f1r2} --max-mnp-distance 0 --native-pair-hmm-threads {threads} 2> {log}
         """

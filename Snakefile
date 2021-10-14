@@ -327,7 +327,7 @@ rule CollectHsMetrics:
         "picard -Xmx16g CollectHsMetrics "
         "BAIT_INTERVALS={params.BAIT_INTERVALS} "
         "TARGET_INTERVALS={params.TARGET_INTERVALS} "
-        "--CIVERAGE_CAP=10000 " # to go beyond 200 reads
+        "--COVERAGE_CAP=10000 " # to go beyond 200 reads
         "INPUT={input.coordsorted} "
         "OUTPUT={output.HSmetrics} "
         "METRIC_ACCUMULATION_LEVEL=ALL_READS "

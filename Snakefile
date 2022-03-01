@@ -5,6 +5,8 @@ import glob
 import os.path as path
 configfile: "config.yaml"
 
+report: "report/workflow.rst"
+
 ## configurations ###########
 PATH_FASTQ = config['path']['fastq']
 PATH_QC = config['path']['qc']
@@ -71,7 +73,7 @@ pairs=dict(zip(Tumor, Normal)) # dictionary containing Tumorname as key and norm
 rule all:
     input:
         path.join(PATH_QC, 'Combined_Metrics.txt'),
-        #expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim', '_bam']),
+        expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim', '_bam']),
         #expand(path.join(PATH_QC, "ReadStats", "{sample}.reads.all"),
         #    sample = Tumor+Normal),
        #expand(path.join(PATH_VAR, 'LoFreq', '{sample}_somatic_final.snvs.vcf.gz'), sample=Tumor),
@@ -119,13 +121,12 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             fq1=path.join(PATH_FASTQ, "{sample}.fastq.mergedR1.gz"),
             fq2=path.join(PATH_FASTQ, "{sample}.fastq.mergedR2.gz")
         output:
-            html1=path.join(PATH_QC, "fastqc", "{sample}.fastq.mergedR1_fastqc.html"),
-            html2=path.join(PATH_QC, "fastqc", "{sample}.fastq.mergedR2_fastqc.html"),
-            zip1=temp(path.join(PATH_QC, "fastqc", "{sample}.fastq.mergedR1_fastqc.zip")),
-            zip2=temp(path.join(PATH_QC, "fastqc", "{sample}.fastq.mergedR2_fastqc.zip"))
-        threads: 1 #config['all']['THREADS']
+            html1=path.join(PATH_QC, "fastqc", "raw", "{sample}.fastq.mergedR1_fastqc.html"),
+            html2=path.join(PATH_QC, "fastqc", "raw", "{sample}.fastq.mergedR2_fastqc.html"),
+            zip1=temp(path.join(PATH_QC, "fastqc", "raw", "{sample}.fastq.mergedR1_fastqc.zip")),
+            zip2=temp(path.join(PATH_QC, "fastqc", "raw", "{sample}.fastq.mergedR2_fastqc.zip"))
         params:
-            fastqc_dir=path.join(PATH_QC, "fastqc")
+            fastqc_dir=path.join(PATH_QC, "fastqc", "raw")
         conda:
             "envs/fastqc.yaml"
         log: path.join(PATH_LOG, "fastqc","{sample}.log")
@@ -160,7 +161,6 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             html2=path.join(PATH_QC,"fastqc", "trimmed","{sample}_R2_trim_fastqc.html"),
             zip1=temp(path.join(PATH_QC, "fastqc", "trimmed", "{sample}_R1_trim_fastqc.zip")),
             zip2=temp(path.join(PATH_QC, "fastqc", "trimmed", "{sample}_R2_trim_fastqc.zip")),
-        threads: 1 #config['all']['THREADS']
         conda:
             "envs/fastqc.yaml"
         params:
@@ -172,10 +172,10 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
 
     rule multiqc_raw:
         input:
-            expand(path.join(PATH_QC, "fastqc", "{sample}{pair}_fastqc.zip"),
+            expand(path.join(PATH_QC, "fastqc", "raw", "{sample}{pair}_fastqc.zip"),
                             pair=['.fastq.mergedR1','.fastq.mergedR2'], sample=AllFiles.keys())
         output:
-            path.join(PATH_QC,'multiqc.html') # empty wildcard allowed
+            report(path.join(PATH_QC,'multiqc.html')) # empty wildcard allowed
         log:
             path.join(PATH_LOG,'multiqc.log')
         wrapper:
@@ -187,7 +187,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             expand(path.join(PATH_QC, "fastqc", "trimmed", "{sample}{pair}_trim_fastqc.zip"),
                             pair=['_R1','_R2'], sample=AllFiles.keys())
         output:
-            path.join(PATH_QC,'multiqc_trim.html') # empty wildcard allowed
+            report(path.join(PATH_QC,'multiqc_trim.html')) # empty wildcard allowed
         log:
             path.join(PATH_LOG,'multiqc_trim.log')
         wrapper:
@@ -203,23 +203,20 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
             ref= config['all']['REF'],
             RGinfo=getRGinfo
         threads: config['all']['THREADS']
+        resources:
+            mem_mb = 17000
         conda:
             "envs/bwa-mem.yaml"
         log: path.join(PATH_LOG, "bwa","{sample}.log")
         shell:
             "bwa mem -M -t {threads} -R {params.RGinfo} {params.ref} {input.fqtrim1} {input.fqtrim2} 2> {log} | samtools view -b -@ {threads}  -> {output} 2>> {log}"
 
-        #"bwa aln -n {params.n} -t {threads} -q {params.q} {params.ref} {input} > {output.sai} 2> {log};"
-        #"bwa samse -r '@RG\tID:{wildcards.sample}\tSM:{wildcards.sample}' -f {output.samse}"
-        #" {paramAbra=$JobName"_abra-realigned.bam"s.ref} {output.sai} {input} 2>> {log}"
-
-
 
 rule Sambamba_sort:
     input:
         path.join(PATH_BAM, "{sample}_aligned_reads.bam"),
     output:
-        qsorted=temp(path.join(PATH_BAM,"{sample}_querysorted.bam")),
+        qsorted=temp(path.join(PATH_BAM,"{sample}_querysorted.bam"))
         #sortbai=temp("../bam/{sample}_querysorted.bam.bai"),
     params:
         tmpdir=PATH_TEMP
@@ -235,12 +232,14 @@ rule mark_duplicates:
         qsorted=path.join(PATH_BAM, "{sample}_querysorted.bam")
     output:
         dedup=temp(path.join(PATH_BAM, "{sample}_dedupped.bam")),
-        metrics_file=path.join(PATH_QC, "Duplicates/{sample}.metrics.txt"),
-    log: path.join(PATH_LOG, "mark_duplicates/{sample}.log"),
+        metrics_file=path.join(PATH_QC, "Duplicates/{sample}.metrics.txt")
+    log: path.join(PATH_LOG, "mark_duplicates/{sample}.log")
     params:
         tmpdir=PATH_TEMP
     conda:
         "envs/picard.yaml"
+    resources:
+        mem_mb = 17000
     shell:
         "picard -Xms4g -Xmx16g MarkDuplicates I={input.qsorted} O={output.dedup} M={output.metrics_file} "
         "ASSUME_SORT_ORDER=queryname TMP_DIR={params.tmpdir} &> {log} ;"
@@ -284,7 +283,6 @@ rule fastqc_bam:
     output:
         bamqc = path.join(PATH_QC, "fastqc", "bam", "{sample}_coordsorted_fastqc.html"),
         bamqczip = path.join(PATH_QC, "fastqc", "bam", "{sample}_coordsorted_fastqc.zip")
-    threads: 1 #config['all']['THREADS']
     params:
         fastqc_dir=path.join(PATH_QC, "fastqc", "bam")
     conda:
@@ -296,15 +294,15 @@ rule fastqc_bam:
 
 
 rule multiqc_bam:
-        input:
-            expand(path.join(PATH_QC, "fastqc", "bam", "{sample}_coordsorted_fastqc.zip"),
+    input:
+        expand(path.join(PATH_QC, "fastqc", "bam", "{sample}_coordsorted_fastqc.zip"),
                             sample=AllFiles.keys())
-        output:
-            path.join(PATH_QC,'multiqc_bam.html') # empty wildcard allowed
-        log:
-            path.join(PATH_LOG,'multiqc_bam.log')
-        wrapper:
-            '0.35.0/bio/multiqc'
+    output:
+        report(path.join(PATH_QC,'multiqc_bam.html')) # empty wildcard allowed
+    log:
+        path.join(PATH_LOG,'multiqc_bam.log')
+    wrapper:
+        '0.35.0/bio/multiqc'
 
 
 
@@ -322,6 +320,8 @@ rule CollectHsMetrics:
     conda:
         "envs/picard.yaml"
     threads:  1 #config['all']['THREADS'],
+    resources:
+        mem_mb = 17000
     log: path.join(PATH_LOG, "picard/{sample}.metrics.log"),
     shell:
         "picard -Xmx16g CollectHsMetrics "
@@ -345,6 +345,8 @@ rule AlignmentMetrics:
         ref=config["all"]["REF"]
     conda:
         "envs/picard.yaml"
+    resources:
+        mem_mb = 17000
     log:
         path.join(PATH_LOG, 'picard/{sample}.alignmetrics.log')
     shell:
@@ -358,11 +360,13 @@ rule InsertsizeMetrics:
         coordsorted=path.join(PATH_BAM, "{sample}_coordsorted.bam"),
     output:
         InsertsizeMetrics=path.join(PATH_QC, "InsertsizeMetrics/{sample}_InsertsizeMetrics.txt"),
-        Histogram=path.join(PATH_QC, "InsertsizeMetrics/{sample}_insertsize_histogram.pdf")
+        Histogram=report(path.join(PATH_QC, "InsertsizeMetrics/{sample}_insertsize_histogram.pdf"))
     conda:
         "envs/picard.yaml"
     log:
         path.join(PATH_LOG, 'picard/{sample}.insertsizemetrics.log')
+    resources:
+        mem_mb = 17000
     shell:
         """picard -Xmx16g CollectInsertSizeMetrics I={input.coordsorted} H={output.Histogram} O={output.InsertsizeMetrics} 2> {log} 
 	touch -a {output.InsertsizeMetrics}

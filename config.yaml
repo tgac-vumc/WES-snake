@@ -3,6 +3,7 @@ path:
     #    fastq: '/home/m.mendeville/MPS-408/WES/fastq'
     fastq: '/net/nfs/PAT/analysis/MPS-409/WES/fastq'
     variant: '/net/nfs/PAT/analysis/MPS-409/WES/variant'
+    maf: '/net/beegfs/cfg/tgac/b.andradebar/CRITICS/mafs'
     copywriter: '/net/nfs/PAT/analysis/MPS-409/WES/copywriter'
     qc: '/home/y.kim1/NKI-WES/qc'
     bam: '/home/y.kim1/NKI-WES/bam'
@@ -73,4 +74,7 @@ Funcotator:
     file_format: VCF #alternative is MAF output file
     transcriptlist: manifests/transcriptlist.txt
 
-
+vcf2maf:
+    vep_fasta: /net/nfs/PAT/archive/Resource/fasta/hg19.chr.fa
+    vep_path:  /trinity/home/bandradebar/miniconda3/envs/WES-snake/bin/
+    vep_data: /net/beegfs/cfg/tgac/b.andradebar/vep/

@@ -23,7 +23,7 @@ PREFIX = config['platform']['prefix'] # prefix before "fastq.gz"
 
 ##### Configurations VariantDetection ######
 PATH_VAR = config['path']['variant']
-
+PATH_MAF = config['path']['maf']
 
 
 ## obtain sample list ###########
@@ -683,7 +683,35 @@ rule merge_vcf:
         vcfcombine {input} > {output} 2> {log}
         """
 
+rule vcf2maf:
+    input:
+        vcf = path.join(PATH_VAR, "funcotated/{sample}_funcotated.vcf"),
+        fasta = config["vcf2maf"]["vep_fasta"],
+        data_vep = config["vcf2maf"]["vep_data"],
+        vep = config["vcf2maf"]["vep_path"],
+    output:
+        maf = path.join(PATH_MAF, "mafs/{sample}.maf")
+    log:    
+        path.join(PATH_LOG, "mafs/{sample}_vcf2maf.txt")
+    shell:
+        """
+        /net/beegfs/cfg/tgac/b.andradebar/mskcc-vcf2maf-754d68a/vcf2maf.pl --input-vcf {input.vcf} --output-maf {output} \
+            --tumor-id {wildcards.sample}.tumor \
+            --ref-fasta {input.fasta} \
+            --vep-data {input.data_vep} --vep-path {input.vep}
+        """
 
+rule merge_mafs:
+    input:
+        expand(path.join(PATH_MAF, 'mafs/{sample}.maf'), sample=Tumor)
+    output:
+        path.join(PATH_MAF, 'mafs/merged.maf')
+    log: 
+        path.join(PATH_LOG, "merge_mafs/merge_mafs.txt")  
+    shell:
+        """
+        cat {input} > {output} 2> {log}
+        """
 
 rule ExtractVcfFields_csv:
     input:

@@ -23,7 +23,6 @@ PREFIX = config['platform']['prefix'] # prefix before "fastq.gz"
 
 ##### Configurations VariantDetection ######
 PATH_VAR = config['path']['variant']
-PATH_MAF = config['path']['maf']
 
 
 ## obtain sample list ###########
@@ -79,7 +78,8 @@ rule all:
        #expand(path.join(PATH_VAR, 'LoFreq', '{sample}_somatic_final.snvs.vcf.gz'), sample=Tumor),
        # expand(path.join(PATH_VAR, "Mutect2/vcf/filtered/{sample}_Mutect2_passed.vcf.gz"), sample=Tumor)
        #expand("../vcf/filtered/{tumor}.all_evidenced.vcf", tumor=Tumor_samples.keys())
-        path.join(PATH_VAR, 'funcotated/merged.vcf')
+        path.join(PATH_VAR, 'funcotated/merged.vcf'),
+        path.join(PATH_VAR, 'merged.maf')
 
 def getRGinfo(wildcards):
     fq=path.join(PATH_FASTQ, "trimmed", wildcards.sample+"_R1_trim.fq.gz")
@@ -429,6 +429,7 @@ rule LoFreq:
         prefix=path.join(PATH_VAR, "LoFreq", "{sample}_")
     conda:
         path.join(PATH_PIPELINE, "envs", "lofreq.yaml")
+    threads: config["all"]["THREADS"]
     log: path.join(PATH_LOG, "LoFreq", "{sample}_lofreq.txt")
     shell:
         """
@@ -690,7 +691,7 @@ rule vcf2maf:
         data_vep = config["vcf2maf"]["vep_data"],
         vep = config["vcf2maf"]["vep_path"],
     output:
-        maf = path.join(PATH_MAF, "mafs/{sample}.maf")
+        maf = path.join(PATH_VAR, "funcotated/{sample}.maf")
     log:    
         path.join(PATH_LOG, "mafs/{sample}_vcf2maf.txt")
     shell:
@@ -698,14 +699,14 @@ rule vcf2maf:
         /net/beegfs/cfg/tgac/b.andradebar/mskcc-vcf2maf-754d68a/vcf2maf.pl --input-vcf {input.vcf} --output-maf {output} \
             --tumor-id {wildcards.sample}.tumor \
             --ref-fasta {input.fasta} \
-            --vep-data {input.data_vep} --vep-path {input.vep}
+            --vep-data {input.data_vep} --vep-path {input.vep} --inhibit-vep
         """
 
 rule merge_mafs:
     input:
-        expand(path.join(PATH_MAF, 'mafs/{sample}.maf'), sample=Tumor)
+        expand(path.join(PATH_VAR, 'funcotated/{sample}.maf'), sample=Tumor)
     output:
-        path.join(PATH_MAF, 'mafs/merged.maf')
+        path.join(PATH_VAR, 'merged.maf')
     log: 
         path.join(PATH_LOG, "merge_mafs/merge_mafs.txt")  
     shell:
@@ -734,6 +735,7 @@ rule ExtractVcfFields_csv:
         """		
 
 
+#ruleorder: merge_mafs > vcf2maf
 
 	#TODO when a table is empty an error occurs and no output is created - maybe create if? 
 	#TODO PON_COUNT < 4 is not recognized correctly, it seems 25 is counted as 2.5 or something like that. if -I is not used F1R2 is not recognized as comma separated list but as decimal value. quick fix is to filter PON_COUNT > 4 out in mutation_overviews.

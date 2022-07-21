@@ -76,5 +76,5 @@ Funcotator:
 
 vcf2maf:
     vep_fasta: /net/nfs/PAT/archive/Resource/fasta/hg19.chr.fa
-    vep_path:  /net/beegfs/cfg/tgac/yokim/miniconda3/envs/WES/bin/
-    vep_data: /net/beegfs/cfg/tgac/b.andradebar/vep/
+    vep_path:  /net/beegfs/cfg/tgac/yokim/miniconda3/envs/WES/bin/ #replace with your own dir
+    vep_data: /net/nfs/PAT/archive/Resource/vep/vep

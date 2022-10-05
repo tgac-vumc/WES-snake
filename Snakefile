@@ -691,7 +691,7 @@ rule vcf2maf:
         data_vep = config["vcf2maf"]["vep_data"],
         vep = config["vcf2maf"]["vep_path"],
     output:
-        maf = path.join(PATH_VAR, "funcotated/{sample}.maf")
+        maf = path.join(PATH_VAR, "mafs/{sample}.maf")
     log:    
         path.join(PATH_LOG, "mafs/{sample}_vcf2maf.txt")
     shell:
@@ -699,7 +699,12 @@ rule vcf2maf:
         /net/beegfs/cfg/tgac/b.andradebar/mskcc-vcf2maf-754d68a/vcf2maf.pl --input-vcf {input.vcf} --output-maf {output} \
             --tumor-id {wildcards.sample}.tumor \
             --ref-fasta {input.fasta} \
-            --vep-data {input.data_vep} --vep-path {input.vep} --inhibit-vep
+            --vep-data {input.data_vep} \
+            --vep-path {input.vep} \
+            --inhibit-vep \
+            --retain-info GT,AD,AF \
+            --vcf-tumor-id {wildcards.sample} \
+            --verbose
         """
 
 rule merge_mafs:

@@ -701,7 +701,6 @@ rule vcf2maf:
             --ref-fasta {input.fasta} \
             --vep-data {input.data_vep} \
             --vep-path {input.vep} \
-            --inhibit-vep \
             --retain-info GT,AD,AF \
             --vcf-tumor-id {wildcards.sample} \
             --verbose

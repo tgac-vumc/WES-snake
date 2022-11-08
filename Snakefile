@@ -28,6 +28,10 @@ PATH_VAR = config['path']['variant']
 ## obtain sample list ###########
 all_Samples=pd.read_csv(config['path']['sampleList'], sep='\t')
 
+## obtain paired/tumorOnly sample lists ###########
+paired_Samples= all_Samples[~all_Samples['Normal'].isnull()]
+tumorOnly_Samples =  all_Samples[all_Samples['Normal'].isnull()]
+
 Tumor=list(all_Samples['Tumor']) # these are IDs, and use as the key to fetch files.
 Normal=list(all_Samples['Normal'])
 
@@ -54,8 +58,6 @@ Normal_samples = getnames(Normal, PLATFORM, PATH_FASTQ)
 AllFiles = Tumor_samples
 AllFiles.update(Normal_samples)
 
-print(Tumor_samples)
-print(Normal_samples)
 
 #Tumor_samples=getnames(Tumor)  # dictionary containing samplename as key and samplename with lanenumber as value
 #Normal_samples=getnames(Normal) # dictionary containing samplename as key and samplename with lanenumber as value
@@ -63,14 +65,14 @@ print(Normal_samples)
 #Tumor_samples=dict(zip(Tumor, Tumor))
 #Normal_samples=dict(zip(Normal, Normal)
 
-pairs=dict(zip(Tumor, Normal)) # dictionary containing Tumorname as key and normalname as value
-
-
+pairs = dict(zip(paired_Samples['Tumor'],paired_Samples['Normal']))
 #####################################
 
 
 rule all:
     input:
+        path.join(PATH_VAR, "LoFreq_paired", "{sample}_somatic_final.snvs.vcf.gz"), sample = paired_Samples['tumor']),
+        path.join(PATH_VAR, "LoFreq_tumorOnly", "{sample}_somatic_final.snvs.vcf.gz"), sample = tumorOnly_Samples['tumor']),
         path.join(PATH_QC, 'Combined_Metrics.txt'),
         expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim', '_bam']),
         #expand(path.join(PATH_QC, "ReadStats", "{sample}.reads.all"),
@@ -410,13 +412,13 @@ rule Collect_Metrics:
 ############## VARIANT DETECTION #################
 
 
-rule LoFreq:
+rule LoFreq_paired:
     input:
         normal = lambda wildcards: path.join(PATH_BAM, pairs[wildcards.sample] + '_coordsorted.bam'),
         tumor=path.join(PATH_BAM, "{sample}_coordsorted.bam")
     output:
-        snps=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.snvs.vcf.gz"),
-        indels=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.indels.vcf.gz")
+        snps=path.join(PATH_VAR, "LoFreq_paired", "{sample}_somatic_final.snvs.vcf.gz"),
+        indels=path.join(PATH_VAR, "LoFreq_paired", "{sample}_somatic_final.indels.vcf.gz")
     params:
         ref=config["all"]["REF"],
         threads=config["all"]["THREADS"],
@@ -426,7 +428,7 @@ rule LoFreq:
         min_alt_bq=config["LoFreq"]["min_alt_bq"],
         max_depth=config["LoFreq"]["max_depth"],
         sig=config["LoFreq"]["sig"],
-        prefix=path.join(PATH_VAR, "LoFreq", "{sample}_")
+        prefix=path.join(PATH_VAR, "LoFreq_paired", "{sample}_")
     conda:
         path.join(PATH_PIPELINE, "envs", "lofreq.yaml")
     threads: config["all"]["THREADS"]
@@ -440,10 +442,40 @@ rule LoFreq:
         2> {log}
         """
 
+rule LoFreq_tumorOnly:
+    input:
+        tumor=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+    output:
+        snps=path.join(PATH_VAR, "LoFreq_tumorOnly", "{sample}_somatic_final.snvs.vcf.gz"),
+        indels=path.join(PATH_VAR, "LoFreq_tumorOnly", "{sample}_somatic_final.indels.vcf.gz")
+    params:
+        ref=config["all"]["REF"],
+        threads=config["all"]["THREADS"],
+        min_cov=config["LoFreq"]["min_cov"],
+        min_mq=config["LoFreq"]["min_mq"],
+        min_bq=config["LoFreq"]["min_bq"],
+        min_alt_bq=config["LoFreq"]["min_alt_bq"],
+        max_depth=config["LoFreq"]["max_depth"],
+        sig=config["LoFreq"]["sig"],
+        prefix=path.join(PATH_VAR, "LoFreq_tumorOnly", "{sample}_")
+    conda:
+        path.join(PATH_PIPELINE, "envs", "lofreq.yaml")
+    threads: config["all"]["THREADS"]
+    log: path.join(PATH_LOG, "LoFreq", "{sample}_lofreq.txt")
+    shell:
+        """
+        lofreq somatic \
+        -t {input.tumor} -f {params.ref} -o {params.prefix} \
+        --min-cov {params.min_cov} \
+        --threads {params.threads} --call-indels --verbose \
+        2> {log}
+        """
+
+        
 rule LoFreq_combine:
     input:
-        snps=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.snvs.vcf.gz"),
-        indels=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.indels.vcf.gz")
+        snps=path.join(PATH_VAR, "Lofreq_{mode}", "{sample}_somatic_final.snvs.vcf.gz"),
+        indels=path.join(PATH_VAR, "LoFreq_{mode}", "{sample}_somatic_final.indels.vcf.gz")
     output:
         tmp=temp(path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.combined.tmp.vcf")),
         out=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.combined.vcf")
@@ -496,13 +528,13 @@ rule zip_vcf:
         """
 
 
-rule Mutect2:
+rule Mutect2_paired:
     input:
         normal=lambda wildcards: path.join(PATH_BAM, pairs[wildcards.sample] + '_coordsorted.bam'),
         tumor=path.join(PATH_BAM, "{sample}_coordsorted.bam")
     output:
-        raw=path.join(PATH_VAR, "Mutect2/{sample}_Mutect2.vcf"),
-        f1r2=path.join(PATH_VAR, "Mutect2/{sample}_f1r2.tar.gz")
+        raw=path.join(PATH_VAR, "Mutect2_paired/{sample}_Mutect2.vcf"),
+        f1r2=path.join(PATH_VAR, "Mutect2_paired/{sample}_f1r2.tar.gz")
     params:
         ref=config["all"]["REF"],
         pon=config["Mutect2"]["pon"],
@@ -521,11 +553,34 @@ rule Mutect2:
         -pon {params.pon} -L {params.interval} --f1r2-tar-gz {output.f1r2} --max-mnp-distance 0 --native-pair-hmm-threads {threads} 2> {log}
         """
 
+rule Mutect2_tumorOnly:
+    input:
+        normal=lambda wildcards: path.join(PATH_BAM, pairs[wildcards.sample] + '_coordsorted.bam'),
+        tumor=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+    output:
+        raw=path.join(PATH_VAR, "Mutect2_tumorOnly/{sample}_Mutect2.vcf"),
+        f1r2=path.join(PATH_VAR, "Mutect2_tumorOnly/{sample}_f1r2.tar.gz")
+    params:
+        ref=config["all"]["REF"],
+        pon=config["Mutect2"]["pon"],
+        gnomad=config["Mutect2"]["gnomad"],
+        interval=config["Mutect2"]["interval"]
+    conda: "envs/gatk4.yaml"
+    threads: config["all"]["THREADS"]
+    log:	path.join(PATH_LOG, "Mutect2/{sample}_mutect2.txt")
+    shell:
+        """
+        gatk Mutect2 -R {params.ref} -I {input.tumor} \
+        -O {output.raw} \
+        --germline-resource {params.gnomad} \
+        -pon {params.pon} -L {params.interval} --f1r2-tar-gz {output.f1r2} --max-mnp-distance 0 --native-pair-hmm-threads {threads} 2> {log}
+        """
 
+        
 #pass this raw mutect data to LearnReadOrientationModel - to be able to filter on orientation bias
 rule LearnReadOrientationModel:
     input:
-        f1r2=path.join(PATH_VAR, "Mutect2/{sample}_f1r2.tar.gz")
+        f1r2=path.join(PATH_VAR, "Mutect2_{mode}/{sample}_f1r2.tar.gz")
     output:
         obmodel=path.join(PATH_VAR, "Mutect2/{sample}_read-orientation-model.tar.gz")
     conda:
@@ -560,7 +615,7 @@ rule CalculateContamination:
 #pass the learned read orientation model and contaminationtable in FilterMutectCalls
 rule FilterMutectCalls:
     input: 
-        raw=path.join(PATH_VAR, "Mutect2/{sample}_Mutect2.vcf"),
+        raw=path.join(PATH_VAR, "Mutect2_{mode}/{sample}_Mutect2.vcf"),
         obmodel=path.join(PATH_VAR, "Mutect2/{sample}_read-orientation-model.tar.gz"),
         segments=path.join(PATH_VAR, "Mutect2/{sample}_segments.table"),
         contamination=path.join(PATH_VAR, "Mutect2/{sample}_calculatecontamination.table"),

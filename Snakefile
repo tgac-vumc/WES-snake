@@ -39,13 +39,13 @@ def getnames(samplelist, platform, pathdata):
     for sample in samplelist:
         if platform in ['SR', 'sr']:
             for prefix in PREFIX:
-                SAMPLES[sample] = glob.glob(path.join(pathdata, sample+'*'+prefix+'.fastq.gz'))
+                SAMPLES[sample] = glob.glob(path.join(pathdata, sample+'*'+prefix+'*.fastq.gz'))
                 SAMPLES[sample].sort()
         if platform in ['PE', 'pe']:
             SAMPLES[sample] = dict()
-            SAMPLES[sample]['R1'] = glob.glob(path.join(pathdata, sample+'*'+PREFIX[0]+'.fastq.gz'))
+            SAMPLES[sample]['R1'] = glob.glob(path.join(pathdata, sample+'*'+PREFIX[0]+'*.fastq.gz'))
             SAMPLES[sample]['R1'].sort()
-            SAMPLES[sample]['R2'] = glob.glob(path.join(pathdata, sample+'*'+PREFIX[1]+'.fastq.gz'))
+            SAMPLES[sample]['R2'] = glob.glob(path.join(pathdata, sample+'*'+PREFIX[1]+'*.fastq.gz'))
             SAMPLES[sample]['R2'].sort()
     return(SAMPLES)
 
@@ -179,7 +179,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
         log:
             path.join(PATH_LOG,'multiqc.log')
         wrapper:
-            '0.35.0/bio/multiqc'
+            'v1.0.0/bio/multiqc'
 
 
     rule multiqc_trim:
@@ -191,7 +191,7 @@ if PLATFORM in ['PE', 'pe']: # I only implement PE for now
         log:
             path.join(PATH_LOG,'multiqc_trim.log')
         wrapper:
-            '0.35.0/bio/multiqc'
+            'v1.0.0/bio/multiqc'
 
     rule bwa_mem:
         input:
@@ -302,7 +302,7 @@ rule multiqc_bam:
     log:
         path.join(PATH_LOG,'multiqc_bam.log')
     wrapper:
-        '0.35.0/bio/multiqc'
+        'v1.0.0/bio/multiqc'
 
 
 
@@ -409,11 +409,42 @@ rule Collect_Metrics:
 
 ############## VARIANT DETECTION #################
 
+rule targetRegionFilter:
+    input:
+          bam=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+    output:
+          exonbam=path.join(PATH_BAM, "{sample}_target_exons.bam")
+    threads: config['all']['THREADS']
+    conda:
+          "envs/samtools.yaml"
+    params:
+          targetbed=config["all"]["targets"]
+    shell:
+          "samtools view -@ {threads} -L {params.targetbed} {input.bam} -b -o {output.exonbam} &&"
+          "samtools index {output.exonbam}"
+
+rule LoFreq_bam_indelQ:
+    input:
+          exonbam=path.join(PATH_BAM, "{sample}_target_exons.bam")
+    output:
+          indelQbam=temp(path.join(PATH_BAM, "{sample}_indelq_tmp.bam")),
+          indelQbamSorted=path.join(PATH_BAM, "{sample}_indelq.bam")
+    params:
+          ref=config["all"]["REF"],
+    conda:
+          path.join(PATH_PIPELINE, "envs", "lofreq.yaml")
+    log: path.join(PATH_LOG, ".LoFreq/{sample}_lofreq_indelq.txt")
+    shell:
+          "lofreq indelqual --dindel -f {params.ref} {input.exonbam} -o {output.indelQbam} 2> {log} &&"
+          "samtools sort -@ {threads} -o {output.indelQbamSorted} {output.indelQbam} 2>> {log} &&"
+          "samtools index {output.indelQbamSorted}"
+
+
 
 rule LoFreq:
     input:
-        normal = lambda wildcards: path.join(PATH_BAM, pairs[wildcards.sample] + '_coordsorted.bam'),
-        tumor=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+        normal = lambda wildcards: path.join(PATH_BAM, pairs[wildcards.sample] + '_indelq.bam'),
+        tumor=path.join(PATH_BAM, "{sample}_indelq.bam")
     output:
         snps=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.snvs.vcf.gz"),
         indels=path.join(PATH_VAR, "LoFreq", "{sample}_somatic_final.indels.vcf.gz")
@@ -453,7 +484,7 @@ rule LoFreq_combine:
         """
 	tabix -f {input.snps} &&
 	tabix -f {input.indels} &&
-        vcfcombine {input.snps} {input.indels} > {output.tmp} && 
+        vcf-merge {input.snps} {input.indels} > {output.tmp} && 
         sed 's/\%//' {output.tmp} | sed 's/FREQ\,Number\=1\,Type\=String/FREQ\,Number\=1\,Type\=Float/' > {output.out}
         """
 

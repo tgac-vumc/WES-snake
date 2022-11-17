@@ -71,8 +71,8 @@ pairs=dict(zip(Tumor, Normal)) # dictionary containing Tumorname as key and norm
 
 rule all:
     input:
-        path.join(PATH_QC, 'Combined_Metrics.txt'),
-        expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim', '_bam']),
+        #path.join(PATH_QC, 'Combined_Metrics.txt'),
+        #expand(path.join(PATH_QC, 'multiqc{trim}.html'), trim = ['', '_trim', '_bam']),
         #expand(path.join(PATH_QC, "ReadStats", "{sample}.reads.all"),
         #    sample = Tumor+Normal),
        #expand(path.join(PATH_VAR, 'LoFreq', '{sample}_somatic_final.snvs.vcf.gz'), sample=Tumor),
@@ -411,28 +411,28 @@ rule Collect_Metrics:
 
 rule targetRegionFilter:
     input:
-          bam=path.join(PATH_BAM, "{sample}_coordsorted.bam")
+        bam=path.join(PATH_BAM, "{sample}_coordsorted.bam")
     output:
-          exonbam=path.join(PATH_BAM, "{sample}_target_exons.bam")
+        exonbam=path.join(PATH_BAM, "{sample}_target_exons.bam")
     threads: config['all']['THREADS']
     conda:
-          "envs/samtools.yaml"
+        "envs/samtools.yaml"
     params:
-          targetbed=config["all"]["targets"]
+        targetbed=config["all"]["targets"]
     shell:
-          "samtools view -@ {threads} -L {params.targetbed} {input.bam} -b -o {output.exonbam} &&"
-          "samtools index {output.exonbam}"
+        "samtools view -@ {threads} -L {params.targetbed} {input.bam} -b -o {output.exonbam} &&"
+        "samtools index {output.exonbam}"
 
 rule LoFreq_bam_indelQ:
     input:
-          exonbam=path.join(PATH_BAM, "{sample}_target_exons.bam")
+        exonbam=path.join(PATH_BAM, "{sample}_target_exons.bam")
     output:
-          indelQbam=temp(path.join(PATH_BAM, "{sample}_indelq_tmp.bam")),
-          indelQbamSorted=path.join(PATH_BAM, "{sample}_indelq.bam")
+        indelQbam=temp(path.join(PATH_BAM, "{sample}_indelq_tmp.bam")),
+        indelQbamSorted=path.join(PATH_BAM, "{sample}_indelq.bam")
     params:
-          ref=config["all"]["REF"],
+        ref=config["all"]["REF"],
     conda:
-          path.join(PATH_PIPELINE, "envs", "lofreq.yaml")
+        path.join(PATH_PIPELINE, "envs", "lofreq.yaml")
     log: path.join(PATH_LOG, ".LoFreq/{sample}_lofreq_indelq.txt")
     shell:
           "lofreq indelqual --dindel -f {params.ref} {input.exonbam} -o {output.indelQbam} 2> {log} &&"
@@ -720,26 +720,26 @@ rule vcf2maf:
         vcf = path.join(PATH_VAR, "funcotated/{sample}_funcotated.vcf"),
         fasta = config["vcf2maf"]["vep_fasta"],
         data_vep = config["vcf2maf"]["vep_data"],
-        vep = config["vcf2maf"]["vep_path"],
     output:
         maf = path.join(PATH_VAR, "mafs/{sample}.maf")
+    conda: "envs/vcf2maf.yaml"
     log:    
         path.join(PATH_LOG, "mafs/{sample}_vcf2maf.txt")
     shell:
-        """
-        /net/beegfs/cfg/tgac/b.andradebar/mskcc-vcf2maf-754d68a/vcf2maf.pl --input-vcf {input.vcf} --output-maf {output} \
+        """ 
+        vcf2maf.pl --input-vcf {input.vcf} --output-maf {output} \
             --tumor-id {wildcards.sample}.tumor \
             --ref-fasta {input.fasta} \
             --vep-data {input.data_vep} \
-            --vep-path {input.vep} \
+            --vep-path $(echo $CONDA_PREFIX)/bin \
             --retain-info GT,AD,AF \
             --vcf-tumor-id {wildcards.sample} \
-            --verbose
+#            --verbose
         """
 
 rule merge_mafs:
     input:
-        expand(path.join(PATH_VAR, 'funcotated/{sample}.maf'), sample=Tumor)
+        expand(path.join(PATH_VAR, 'mafs/{sample}.maf'), sample=Tumor)
     output:
         path.join(PATH_VAR, 'merged.maf')
     log: 

@@ -7,3 +7,4 @@ dependencies:
     - snpsift == 4.3.1t
     - picard=2.15.0
     - vcftools==0.1.16
+    - vcflib

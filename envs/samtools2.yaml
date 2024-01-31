@@ -1,0 +1,8 @@
+
+channels:
+    - conda-forge
+    - bioconda
+dependencies:
+    - samtools=1.6
+    - htslib=1.9
+    - ncurses=6.3

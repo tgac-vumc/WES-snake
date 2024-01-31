@@ -6,3 +6,4 @@ dependencies:
     - snpsift == 4.3.1t
     - picard=2.15.0
     - vcflib==1.0.1
+    - samtools

@@ -1,0 +1,6 @@
+channels:
+    - conda-forge
+    - bioconda
+dependencies:
+    - fastqc=0.11.5
+    - zstd==1.5.2

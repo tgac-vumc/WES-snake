@@ -50,3 +50,98 @@ Useful snakemake options
 -T , --timestamp : Add a timestamp to all logging output
 
 for all options go to http://snakemake.readthedocs.io/en/stable/executable.html#all-options
+
+```
+
+RUN PIPELINE:
+A way to run the mutation calling pipeline is with the use of the following command:
+snakemake -s Snakefile --cluster "sbatch -c {threads} -o log/slurm/%j.out --mem {resources.mem_mb}" --default-resources mem_mb=8000 -j50 --rerun-incomplete --use-conda
+--cluster "sbatch"	= is used to run on the slum server
+-c {threads} 		= some rules state config["all"]["THREADS"], if you more threads for those specific rules you can change the THREADS value in config.yaml file
+-o log/slurm/%j.out 	= wil save the logfiles at this location, make sure that log/slurm directory exicts before running
+--mem {resourcs.mem_mb} = some rules state resources:mem_mb and/or resources:disk_mb> with use of this command the minimum mem_mb of 8000 will be overwritten 
+--default-resources	= will calculate for each rule the ammount of maximum mem_mb and disk_mb needed based on max(2*input.size_mb, 1000).  
+mem_mb 			= will make the minimum mem_mb the should be used 8000
+-j 			= for the ammount of jobs that can run parralel 
+--rerun-incomplete 	= Re-run all jobs the output of which is recognized as incomplete.
+--use-conda 		= This must be stated to make use of the differen conda envirnoments that are used in the pipeline. 
+
+```
+
+SamplesTable.tsv:
+SamplesTable.tsv, in this file the sample ID's you want to use should be stated. 
+The prefixes after the ID's should be given in the config.yaml in the place for platform:prefix: 
+This should be a list with string values in it: ['_R1_001', '_R2_001']
+It is important that all lines in SamplesTable.tsv do not have a tab or space in the end.
+If there are tabs or spaces at the end of a line some samples might not be analyzed with the script. 
+The files that the pipeline uses all be in one location and the path should be given to the config.yaml file in path:fastq: 
+Also there has to be a TAB between a tumor and normal ID, you CAN NOT use a space inbetween. 
+-
+EXAMPLE:
+Files you want to use could be:
+401-032-2_HGTGWDSXY_S28_L001_R1_001.fastq.gz
+401-032-2_HGTGWDSXY_S28_L001_R2_001.fastq.gz
+401-032-2_HGTGWDSXY_S28_L002_R1_001.fastq.gz
+401-032-2_HGTGWDSXY_S28_L002_R2_001.fastq.gz
+-
+The ID that you would write down in SamplesTable.tsv should be: 401-032-2_HGTGWDSXY_S28
+In Config.yaml platform:prefix the list should contain: ['_R1_001', '_R2_001']
+In Config.yaml path:fastq the directory path to these fastq.gz files should be given.
+-
+EXAMPLE for ID's stated in SamplesTable.tsv:
+Tumor   Normal
+104-026-9_HGTGWDSXY_S33	104-026-9_S42
+401-105-5_HGTGWDSXY_S32
+-
+Be sure that there is a TAB [\t]  between a tumor and normal ID. ( ERROR DO NOT USE A SPACE [ ] ) 
+TRUE
+Tumor   Normal
+104-026-9_HGTGWDSXY_S33[\t]104-026-9_S42
+
+ERROR:
+104-026-9_HGTGWDSXY_S33[ ]104-026-9_S42
+
+
+```
+ 
+Config.yaml: 
+There are many values that can be changed to personalize the analysis but the following are the most important to have stated for the script to work:
+In the config.yaml file there should be stated in path:fastq: the path to all the fastq.gz files. 
+In the config.yaml file in all:THREADS: you can define the amount of threads some rules may use. 
+In the config.yaml file in paht:fastq the directory path that contains all the fastq.gz files should be stated. 
+
+
+```
+CODE ALTERATIONS:
+
+$rule bam_to_fastq:	can be used at the start of the pipeline to turn bam files to fastq files. 
+!!!			Is set to non-functional with use "#"
+
+ALTER THE FOLLOWING RULES IF THERE ARE PROBLEMS WITH THE ID'S IN THE BAM FILES ARE THE SAME IN THE BAM-NORMAL FILE AND BAM-TUMOR FILE.
+$rule change_bam_header:		can be used if the ID in the HEADER and BAM file of NORMAL and TUMOR are the SAME. 
+$rule Sambamba_sort2_bam_header:        can be used if the ID in the HEADER and BAM file of NORMAL and TUMOR are the SAME. 
+$rule Mutect2_paired:  to use output from the $rules change_bam_header and Sambamba_sort2_bam_header change INPUT:NORMAL=  in RULE STATEMENT of rule  Mutect2_paired: 
+		#input:normal=path.join(PATH_BAM, "{sample_paired}_normal2_coordsorted.bam"),   				#if  change_bam_header and Sambamba_sort2_bam_header ARE USED
+                #input:normal=lambda wildcards: path.join(PATH_BAM, pairs[wildcards.sample_paired] + '_coordsorted.bam')        #if  NOT
+!!!	default now set to not use output from change_bam_header and Sambamba_sort2
+
+ALTER THE FOLLOWING RULE IF MUTATIONS ARE THOUGHT TO BE GIVEN CERTAIN FILTER VALUES
+$rule Mutect_passed:
+CHANGE THE snpSift filter to include germline or haplotyp IF NEEDED
+!!!	default now set to "SnpSift filter -f {input.filtered} "((FILTER =~ 'PASS' | FILTER =~ 'germline') & (ROQ > 20 | TLOD > 20))" > {output.passed} &&"
+
+WRAPPER was giving errors. Orginal rule still present in the pipeline if developer fixes WRAPPER.
+$rule new_multiqc_raw:  ==	$rule multiqc_raw:
+$rule new_multiqc_trim: ==	$rule multiqc_trim:
+$rule new_multiqc_bam:  ==	$rule multiqc_bam:
+
+
+
+```
+When running the pipeline with slurm make sure ther is an directory called */log/slurm.
+
+
+
+
+
+

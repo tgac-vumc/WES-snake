@@ -1,18 +1,18 @@
 
 path:
     #    fastq: '/home/m.mendeville/MPS-408/WES/fastq'
-    fastq: 'fastq'
+    fastq: '/net/beegfs/cfg/tgac/ferdinand/barabara_wes_25_09_2023/stolen_bam' #'/net/beegfs/cfg/tgac/ferdinand/WES_new/MPS-409/fastq' # /net/beegfs/cfg/tgac/ferdinand/WES-snake/fastq' #this should give the location of all the fastq files
     variant: 'variant'
     copywriter: 'copywriter'
     qc: 'qc'
-    bam: 'bam'
+    bam: 'bam' #'/net/beegfs/cfg/tgac/b.andradebar/Groningen/bam'
     log: 'log'
     covariance: 'CovMetrics'
     temp: 'temp'
     sampleList: 'SamplesTable.tsv'
 
 platform:
-    SRorPE: 'PE'
+    SRorPE: 'PE' #'na'  #'PE'
     prefix: ['_R1_001', '_R2_001']
 
 cutadapt:
@@ -20,7 +20,8 @@ cutadapt:
               "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"]
 
 all:
-    REF: /net/nfs/PAT/archive/Yongsoo/Resource/fasta/hg19.chr.fa
+    REF: /net/nfs/PAT/archive/Yongsoo/Resource/fasta/hg19.chr.fa  #hg19.chr does work for bwa_   #hg19.fa  #maar het moet chr bevatten  ther is a file missing for  hg19.chr.fa   the file is hg19.chr.fa.ann
+    REF_bwa: /net/nfs/PAT/archive/Yongsoo/Resource/fasta/hg19.chr 
     THREADS: 18 
     Java_mem: -Xmx4g
     targets: /net/nfs/PAT/archive/Yongsoo/Resource/KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
@@ -33,11 +34,8 @@ all:
     HMF_PON: /net/nfs/PAT/archive/Resource/data/blacklist/HMF_PON/PON.vcf.gz
     HG19_DICT: /net/nfs/PAT/archive/Resource/fasta/hg19.chr.dict
 
-
-
 trim:
     min_len: 20
-
 
 LoFreq:
     min_cov: 10
@@ -49,16 +47,12 @@ LoFreq:
     af_min: 0.05
     cov_min: 15
     sb_alpha: 0.05
-    #SnpSift_filter: "(DP4[2]>2) & (DP4[3]>2) & ((na HRUN) | (HRUN<8))"
-    BED_blacklist: manifests/PON_LoFreq_N24_min2POS_V2_ABRA2_200430.bed
-    #Gene_blacklist: /net/nfs/PAT/home/matias/data/blacklist/hypervariable_gene_blacklist.bed
-    Gene_blacklist: /net/nfs/PAT/archive/Yongsoo/Resource/blacklist/hypervariable_gene_blacklist.bed
-
-
+    BED_blacklist: /net/beegfs/cfg/tgac/jjanssen4/PON/PON/LoFreq/PON_n247_LoFreq_Hyperexome_WES_min2_pos_0.05minAF.bed # manifests/PON_LoFreq_N24_min2POS_V2_ABRA2_200430.bed
+    Gene_blacklist: /net/beegfs/cfg/tgac/Resource/data/blacklist/hypervariable_gene_blacklist.bed    #/net/nfs/PAT/archive/Yongsoo/Resource/blacklist/hypervariable_gene_blacklist.bed
 
 Mutect2:
     gnomad: /net/nfs/PAT/archive/Resource/dbSNP/2.0.2/gnomad.exomes.r2.0.2-AF_chr.vcf.gz
-    pon: "null"
+    pon: /net/beegfs/cfg/tgac/jjanssen4/PON/PON/Mutect2/PON_n247_Mutect2_Hyperexome_WES_min2_pos_0.05minAF.vcf.gz #"null"
     interval: /net/nfs/PAT/archive/Resource/KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
     clustered: 50 
     af_min: 0.05
@@ -68,7 +62,6 @@ Mutect2:
     interval: /net/nfs/PAT/archive/Resource/KAPA_New_Exome/KAPA_HyperExome_hg19_primary_targets.bed
 
 Funcotator:
-    #datasource: /net/nfs/PAT/home/tjitske/files/funcotator_db/funcotator_dataSources.v1.7.20200521s
     datasource: /net/nfs/PAT/archive/Resource/Funcotator/funcotator_dataSources.v1.7.20200521s
     hg_version: hg19    #alternative is hg38 
     file_format: VCF #alternative is MAF output file
@@ -76,5 +69,4 @@ Funcotator:
 
 vcf2maf:
     vep_fasta: /net/nfs/PAT/archive/Resource/fasta/hg19.chr.fa
-    vep_path:  /net/beegfs/cfg/tgac/yokim/miniconda3/envs/WES/bin/ #replace with your own dir
     vep_data: /net/nfs/PAT/archive/Resource/vep/vep

@@ -1,11 +1,11 @@
 channels:
     - conda-forge
     - bioconda
-    - defaults
 dependencies:
-    - vcf2maf == 1.6.19
-    - ensembl-vep == 102.0
-    - htslib == 1.10.2
-    - bcftools == 1.10.2
-    - samtools == 1.10
-    - ucsc-liftover==377
+    - vcf2maf=1.6.19
+    - ensembl-vep=102.0
+    - htslib=1.9
+    - bcftools=1.9
+    - samtools=1.9
+    - ucsc-liftover=357
+
